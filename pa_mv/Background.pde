@@ -4,14 +4,24 @@ class Backroom {
   // Tambahkan parameter int currentBeat
   void display(int subBeat, int currentBeat) {
     
-    // --- LOGIKA PEMILIHAN BACKGROUND (BEAT 8 - 40) ---
     // Kita gunakan modulo (%) agar background terus berulang 1-2-3-4
     int bgChoice = 0; 
     
-    if (currentBeat >= 8 && currentBeat <= 40) {
+    if (currentBeat >= 22 && currentBeat <= 23){
+      bgChoice = 0; // Background 1: Gelap, Kuning
+    }
+    else if (currentBeat >= 8 && currentBeat <= 40) {
       // Rumus: (beat - 8) % 4 akan menghasilkan 0, 1, 2, 3 secara berurutan
       bgChoice = (currentBeat - 8) % 4; 
-    } else {
+    }
+    else if (currentBeat >= 150 && currentBeat <= 151){
+      bgChoice = 0; // Background 1: Gelap, Kuning
+    }
+    else if (currentBeat >= 136 && currentBeat <= 168) {
+      // Rumus: (beat - 136) % 4 akan menghasilkan 0, 1, 2, 3 secara berurutan
+      bgChoice = (currentBeat - 136) % 4; 
+    }
+    else {
       // Jika di luar beat 8-40, kita bisa gunakan background default (misal 0)
       bgChoice = 0; 
     }

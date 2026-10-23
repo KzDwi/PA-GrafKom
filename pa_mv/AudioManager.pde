@@ -1,18 +1,26 @@
 class AudioBeatManager {
   float bpm = 162;
-  float beatDuration; // dalam milidetik
+  float beatDuration; 
   
   AudioBeatManager() {
-    beatDuration = 60000.0 / bpm; // 60000ms / 162 = ~370ms
+    beatDuration = 60000.0 / bpm; 
   }
   
-  // Fungsi untuk mendapatkan beat saat ini (0, 1, 2, dst)
   int getBeat(float posMs) {
     return (int)(posMs / beatDuration);
   }
   
-  // Fungsi untuk sub-beat (misal 2x lebih cepat)
   int getSubBeat(float posMs) {
     return (int)(posMs / (beatDuration / 2));
+  }
+  
+  // TAMBAHKAN INI: Untuk Layer 3 (1/4 ketukan)
+  int getQuarterBeat(float posMs) {
+    return (int)(posMs / (beatDuration / 4));
+  }
+  
+  // TAMBAHKAN INI: Untuk Layer 4 (1/8 ketukan)
+  int getEighthBeat(float posMs) {
+    return (int)(posMs / (beatDuration / 8));
   }
 }
