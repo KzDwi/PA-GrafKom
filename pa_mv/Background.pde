@@ -1,37 +1,79 @@
 class Backroom {
   float z = 0;
   
-  void display(int subBeat) {
-    background(50);
+  // Tambahkan parameter int currentBeat
+  void display(int subBeat, int currentBeat) {
+    
+    // --- LOGIKA PEMILIHAN BACKGROUND (BEAT 8 - 40) ---
+    // Kita gunakan modulo (%) agar background terus berulang 1-2-3-4
+    int bgChoice = 0; 
+    
+    if (currentBeat >= 8 && currentBeat <= 40) {
+      // Rumus: (beat - 8) % 4 akan menghasilkan 0, 1, 2, 3 secara berurutan
+      bgChoice = (currentBeat - 8) % 4; 
+    } else {
+      // Jika di luar beat 8-40, kita bisa gunakan background default (misal 0)
+      bgChoice = 0; 
+    }
+
+    // --- TERAPKAN VARIASI BACKGROUND ---
+    color bgColor;
+    color strokeColor1;
+    color strokeColor2;
+    
+    switch(bgChoice) {
+      case 0: // Background 1: Gelap, Kuning
+        bgColor = color(50);
+        strokeColor1 = color(255, 100, 100); // Merah
+        strokeColor2 = color(200, 200, 100); // Kuning
+        break;
+      case 1: // Background 2: Biru Gelap, Cyan
+        bgColor = color(10, 20, 50);
+        strokeColor1 = color(100, 255, 255); // Cyan
+        strokeColor2 = color(100, 150, 255); // Biru terang
+        break;
+      case 2: // Background 3: Hijau Gelap, Hijau Neon
+        bgColor = color(10, 40, 10);
+        strokeColor1 = color(100, 255, 100); // Hijau
+        strokeColor2 = color(200, 255, 100); // Hijau kekuningan
+        break;
+      case 3: // Background 4: Ungu Gelap, Magenta
+        bgColor = color(40, 10, 50);
+        strokeColor1 = color(255, 100, 255); // Magenta
+        strokeColor2 = color(150, 100, 255); // Ungu terang
+        break;
+      default:
+        bgColor = color(50);
+        strokeColor1 = color(255);
+        strokeColor2 = color(200);
+    }
+
+    // Terapkan background
+    background(bgColor);
     lights(); 
     
-    // Rotasi akan bergoyang antara -0.2 dan 0.2 radian
-    // Nilai berubah tiap sub-beat
     float rotasi = sin(subBeat * PI) * 0.2; 
     
     for (int i = 0; i < 10; i++) {
       pushMatrix();
       translate(width/2, height/2, -i * 200 + z);
-      
-      rotateZ(rotasi); // Menggunakan rotasi yang sudah dihitung
+      rotateZ(rotasi); 
       
       noFill();
-      // Beri warna stroke yang berbeda tiap kelipatan 4 sub-beat (1 birama)
+      
+      // Gunakan warna stroke yang sudah ditentukan berdasarkan bgChoice
+      // Tetap pertahankan efek ganti warna per 4 sub-beat (1 birama) seperti sebelumnya
       if (subBeat % 4 == 0) {
-        stroke(255, 100, 100); // Warna merah tiap 1 bar
+        stroke(strokeColor1); 
       } else {
-        stroke(200, 200, 100); // Warna kuning
+        stroke(strokeColor2); 
       }
       
       box(300); 
       popMatrix();
     }
     
-    // Kecepatan lorong maju juga bisa disinkronkan
-    // Misal: bergerak lebih cepat tiap 1 beat
     z += 5; 
-    
-    // Reset z agar tidak terlalu jauh ke depan (looping)
     if (z > 200) z = 0;
   }
 }

@@ -36,7 +36,7 @@ void draw() {
   }
   
   // 4. Render
-  ruangan.display(currentSubBeat); // Background 3D berputar tiap sub-beat
+  ruangan.display(currentSubBeat, currentBeat); // Background 3D berputar tiap sub-beat
   bola.update();
   bola.display();
   
@@ -49,6 +49,7 @@ void draw() {
   
   // Menampilkan BPM dan Beat saat ini (untuk debugging)
   textSize(20);
+  // int[] lirikBeat = {42,50,57,66,72,80,88,96}; // Beat yang ingin ditampilkan
   text("Beat: " + currentBeat + " | SubBeat: " + currentSubBeat, width/2, height - 50);
   hint(ENABLE_DEPTH_TEST); // Kembalikan ke mode 3D
 }
