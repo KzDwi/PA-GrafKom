@@ -5,6 +5,7 @@
 // =====================================================================
 import processing.sound.*;
 
+final float VOLUME = 0.1;   // volume lagu (dipakai juga saat play/restart)
 SoundFile lagu;
 PFont fontJepang;
 BeatClock clock;
@@ -21,6 +22,10 @@ ElKontrol    kontrol;
 ElTvStatic   tvStatic;
 ElEfekVHS    efekVHS;
 FxTransition transitionFx;
+ElDoorLoop   doorLoop;    
+ElKinetik    kinetik;    
+FxMosaic     mosaicFx;   
+FxRiser      riser;       
 
 void setup() {
   size(1280, 720, P3D);
@@ -31,7 +36,7 @@ void setup() {
   fontJepang = createFont("NotoSansJP-Regular.ttf", 32);
   lagu = new SoundFile(this, "assets/MainSong.mp3");
   lagu.play();
-  lagu.amp(0.1); // buat test aja
+  lagu.amp(VOLUME); // buat test aja
   
   clock = new BeatClock();
 
@@ -46,6 +51,10 @@ void setup() {
   tvStatic  = new ElTvStatic();
   efekVHS   = new ElEfekVHS();
   transitionFx = new FxTransition();
+  doorLoop  = new ElDoorLoop();
+  kinetik   = new ElKinetik(fontJepang);
+  mosaicFx = new FxMosaic();
+  riser     = new FxRiser(this, 100, 103);   
 }
 
 void draw() {
@@ -54,9 +63,11 @@ void draw() {
 
 // ===================== 1. LATAR 3D (pilih salah satu) =====================
   // Disusun berurutan (kronologis) berdasarkan ketukan (beat) lagu
-  if      (clock.inBeat(8, 22))    backrooms.show(clock, 0);  // Beat 8-21: Lorong kuning
-  else if (clock.inBeat(22, 24))   backrooms.show(clock, 1);  // Beat 22-23: Lorong abu-abu
-  else if (clock.inBeat(24, 40))   backroomStatic.show(clock, ((clock.beat - 24) % 4) + 1); // Beat 24-39: Ruang statis berganti-ganti
+  if      (clock.inBeat(100, 103)) doorLoop.show(clock, 100);   
+  else if (clock.inBeat(103, 136)) { /* latar = adegan kinetik 2D (digambar di bagian 2D) */ }
+  else if (clock.inBeat(8, 22))    backrooms.show(clock, 0);  
+  else if (clock.inBeat(22, 24))   backrooms.show(clock, 1);  
+  else if (clock.inBeat(24, 40))   backroomStatic.show(clock, ((clock.beat - 24) % 4) + 1); 
   
   // (Beat 40 - 135 akan otomatis jatuh ke 'else' di bawah, yaitu ruang statis 0)
   
@@ -68,7 +79,7 @@ void draw() {
 
   // ===================== 2. ELEMENT 2D (boleh numpuk/overlap) =====================
   // Urutan panggil = urutan tumpukan (yang terakhir paling depan)
-  bola.show(clock);                                // selalu tampil
+  if (!clock.inBeat(100, 136)) bola.show(clock);  // bola disembunyikan di adegan pintu & kinetik
   if (clock.inBeat(0, 200)) poli.show(clock);      // beat 0-199
   
   //40,47
@@ -94,9 +105,19 @@ void draw() {
   }
 
 
+  // , beat 103-136
+  if (clock.inBeat(103, 136)) kinetik.show(clock, lirik);
+  if (clock.inBeat(100, 136)) efekVHS.show(clock);  // grain/scanline di pintu & kinetik
+
   transitionFx.show();
   judul.show(clock);
   lirik.show(clock);                               // timing lirik diatur di el_Teks.pde
+  transitionFx.showGlitch();                       // glitch satu layar (di atas semua, di bawah UI)
+
+  // Transisi mozaik "TV rabun": pintu -> kotak-kotak makin besar -> gelap (102.2 -> 103.0),
+  // lalu adegan baru muncul dari kotak besar -> jelas (103.0 -> 103.6)
+  mosaicFx.show(clock, 102.2, 103.0, 103.0, 103.6);
+  //riser.update(clock, kontrol.isPlaying);          // suara naik beat 100-103 (diam saat pause)
   
 
   // ===================== 3. UI =====================
@@ -112,6 +133,16 @@ void draw() {
   // }
   
   // ===================== 4. EVENT SEKALI (di sini switch cocok) =====================
+  // ---- GLITCH (jadwal dalam SUBBEAT; 1 beat = 2 subbeat) ----
+  if (clock.atSubBeat(142)) transitionFx.triggerGlitch();  // Beat 71  : 
+  if (clock.atSubBeat(158)) transitionFx.triggerGlitch();  // Beat 79  : 
+  if (clock.atSubBeat(174)) transitionFx.triggerGlitch();  // Beat 87  : 
+  if (clock.atSubBeat(191)) transitionFx.triggerGlitch();  // Beat 95.5: 
+  if (clock.atSubBeat(203)) transitionFx.triggerGlitch();  // Beat 101.5: 
+  if (clock.atSubBeat(238)) transitionFx.triggerGlitch();  // Beat 117.5:
+  if (clock.atSubBeat(271)) transitionFx.triggerGlitch();  // Beat 136  : 
+  // (posisi anak untuk tiap teleport diatur di el_tvstatic.pde -> boySub / boyStartX)
+
   if (clock.newBeat) {
     switch (clock.beat) {
       case 99: 
@@ -128,4 +159,8 @@ void draw() {
 
 void mousePressed() {
   kontrol.mousePressed();
+}
+
+void keyPressed() {
+  if (key == 'c' || key == 'C') kontrol.setCheckpoint();   // simpan titik RESTART di posisi sekarang
 }

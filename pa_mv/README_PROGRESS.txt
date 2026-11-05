@@ -71,6 +71,40 @@ environment) - expect to fix small compile/runtime errors first.
              sekarang backroomStatic.show(clock, 0). Pemilik akan mengatur sendiri
              kapan tiap ruang muncul.
 
+[Tahap 6] Perbaikan bug + glitch/teleport anak.
+          -> Suara membesar setelah pause->play: play() mereset amp ke 1.0, sekarang lagu.amp(VOLUME) dipanggil ulang.
+          -> Pause lalu RESTART cepat = 2 lagu jalan: jump(0) saat pause ikut memutar lagu; diganti stop()+play(), plus debounce klik 200ms dan transitionFx.reset().
+          -> BeatClock.atSubBeat(n) ditambahkan. FxTransition.triggerGlitch()/showGlitch() (glitch satu layar, 2 frame).
+          -> Glitch di subbeat 142, 158, 174, 191. Anak masuk di subbeat 145, teleport di 158/174/191 (jadwal & posisi: boySub/boyStartX di el_tvstatic.pde).
+          -> BELUM dikompilasi/dijalankan (tanpa Processing di lingkungan penulis).
+
+[Tahap 7] Cuplikan pintu loop + adegan kinetik + perbaikan restart.
+          -> el_DoorLoop.pde (3D, beat 100-103, loop 2x), fx_crt.pde (layar TV mati/nyala),
+             fx_riser.pde (suara naik sintesis), el_Kinetik.pde (adegan beat 103-136, ref video 0:37-0:50;
+             slot gambar data/img_kuru.png, img_kurikaesu.png, img_fractal.png, img_slide.png).
+          -> el_Kontrol.pde: tombol CHECKPOINT (+ tombol C); RESTART = stop() + jump(checkpoint), langsung play.
+          -> el_tvstatic.pde: teleport terakhir anak dihitung mundur agar tiba di tepi kanan di beat 100.
+          -> BELUM dikompilasi/dijalankan. Video referensi TIDAK bisa ditonton (tanpa akses internet);
+             adegan kinetik dibuat dari deskripsi di README + data lirik.
+
+[Tahap 8] Revisi setelah video referensi (Kurikaesu.mp4) diterima.
+          -> el_DoorLoop.pde: pintu terbuka SATU kali (beat 100.3-101.3), kamera maju lalu DIAM.
+          -> fx_crt.pde DIHAPUS, diganti fx_mosaic.pde (FxMosaic: transisi kotak-kotak "TV rabun",
+             keluar 102.2->103.0, masuk 103.0->103.6).
+          -> el_Kinetik.pde DITULIS ULANG mengikuti video: pita spiral zaitun + huruf lirik raksasa,
+             1 klon anak berjalan per beat (103->117), kolom emas loncat per beat (mulai 117.5).
+             Slot gambar: data/img_walk, img_walk2, img_spiral (png/jpg).
+
+[Tahap 9] Latar terowongan (beat 72-100, ElTvStatic room 4) berganti tiap anak teleport.
+          -> el_tvstatic.pde: drawScrollingTape() dipecah jadi drawTunnelBand(t, style) + bandTape/
+             bandArch/bandPlay/bandHall. Ukuran band tetap (340px), tetap gelap (overlay room 4).
+             style 0 = pita kaset (awal), 1 = lorong lengkung hijau (teleport 1), 2 = ruang bermain
+             biru (teleport 2), 3 = lorong berpintu kuning (teleport 3, palet = latar el_DoorLoop).
+             Style mengikuti boySub[] lewat boySeg()/tunnelStyle(). Di style 3 scroll melambat &
+             berhenti di boyEndBeat, pintu terakhir berhenti di depan anak (sinkron ke adegan pintu).
+             Room 3 (beat 56-72) tetap memakai style 0 terang seperti sebelumnya.
+          -> BELUM dikompilasi/dijalankan.
+
 =====================================================================
  3. STATUS SAAT INI
 =====================================================================

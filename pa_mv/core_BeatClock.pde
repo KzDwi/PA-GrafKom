@@ -15,6 +15,8 @@ class BeatClock {
   boolean newBeat = false;     // true hanya di frame pertama saat beat berganti
 
   int lastBeat = -1;
+  int lastSubBeat = -1;        // subBeat frame sebelumnya (untuk atSubBeat)
+  int prevSubBeat = -1;
 
   BeatClock() {
     beatDuration = 60000.0 / bpm;
@@ -31,11 +33,23 @@ class BeatClock {
 
     newBeat  = (beat != lastBeat);
     lastBeat = beat;
+
+    prevSubBeat = lastSubBeat;
+    lastSubBeat = subBeat;
   }
 
   // dipanggil saat lagu di-restart / lompat
   void reset() {
     lastBeat = -1;
+    lastSubBeat = -1;
+    prevSubBeat = -1;
+  }
+
+  // TRUE sekali saja, tepat saat subBeat n baru dimulai (1 beat = 2 subBeat).
+  // Aman kalau ada frame yang ke-skip (pakai "melewati", bukan "sama dengan").
+  // Setelah restart/jump (reset) tidak akan memicu salah.
+  boolean atSubBeat(int n) {
+    return prevSubBeat >= 0 && prevSubBeat < n && subBeat >= n;
   }
 
   // beat sekarang ada di rentang [dari, sampai) ?   contoh: inBeat(8, 40)
