@@ -35,7 +35,7 @@ class ImageSlot {
 
 class ElKinetik {
   PFont font;
-  boolean tampilKarakter = true;   // true = anak berjalan tampil, false = hilang (hanya latar)
+  boolean tampilKarakter = false;   // true kalau udh ada gambar
   float skalaGambar = 0.6;   // 1.0 = ukuran asli, 0.5 = setengah, 0.3 = sepertiga
   ImageSlot sprite1, sprite2, imgSpiral;
 
