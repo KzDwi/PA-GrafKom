@@ -26,6 +26,8 @@ ElDoorLoop   doorLoop;
 ElKinetik    kinetik;    
 FxMosaic     mosaicFx;   
 FxRiser      riser;       
+ElVoidFall   voidFall;
+ElLorongCahaya lorongCahaya;
 
 void setup() {
   size(1280, 720, P3D);
@@ -55,6 +57,8 @@ void setup() {
   kinetik   = new ElKinetik(fontJepang);
   mosaicFx = new FxMosaic();
   riser     = new FxRiser(this, 100, 103);   
+  voidFall  = new ElVoidFall();
+  lorongCahaya = new ElLorongCahaya(fontJepang);
 }
 
 void draw() {
@@ -75,11 +79,18 @@ void draw() {
   else if (clock.inBeat(150, 152)) backrooms.show(clock, 2);  // Beat 150-151: Lorong ungu
   else if (clock.inBeat(152, 168)) backrooms.show(clock, 0);  // Beat 152-167: Lorong kuning
   
+  else if (clock.inBeat(168, 177)) voidFall.show3D(clock, 0); // Scene 0: Kubus meledak perlahan
+  else if (clock.inBeat(177, 185)) voidFall.show3D(clock, 1); // Scene 1: Void partikel saja
+  else if (clock.inBeat(185, 194)) voidFall.show3D(clock, 2); // Scene 2: Lorong 3D jalan
+  else if (clock.inBeat(194, 200))   voidFall.show3D(clock, 3); // Scene 3: Tabrakan/Transisi
+  
+  else if (clock.inBeat(200, 228)) lorongCahaya.show3D(clock);
+  
   else                             backroomStatic.show(clock, 0); // Waktu kosong / sisanya: Default (ruang statis 0)
 
   // ===================== 2. ELEMENT 2D (boleh numpuk/overlap) =====================
   // Urutan panggil = urutan tumpukan (yang terakhir paling depan)
-  if (!clock.inBeat(100, 136)) bola.show(clock);  // bola disembunyikan di adegan pintu & kinetik
+  if (!clock.inBeat(100, 136) && !clock.inBeat(168, 228)) bola.show(clock); // bola disembunyikan di adegan pintu & kinetik
   if (clock.inBeat(0, 200)) poli.show(clock);      // beat 0-199
   
   //40,47
@@ -108,10 +119,16 @@ void draw() {
   // , beat 103-136
   if (clock.inBeat(103, 136)) kinetik.show(clock, lirik);
   if (clock.inBeat(100, 136)) efekVHS.show(clock);  // grain/scanline di pintu & kinetik
+  
+  if (clock.inBeat(200, 228)) lorongCahaya.show2D(clock, lirik);
+  
+  if (clock.inBeat(168, 194)) {
+    voidFall.show2D(clock); // Otomatis menyesuaikan scene yang diset oleh show3D
+  }
 
   transitionFx.show();
   judul.show(clock);
-  lirik.show(clock);                               // timing lirik diatur di el_Teks.pde
+  if (!clock.inBeat(200, 228)) lirik.show(clock);                            // timing lirik diatur di el_Teks.pde
   transitionFx.showGlitch();                       // glitch satu layar (di atas semua, di bawah UI)
 
   // Transisi mozaik "TV rabun": pintu -> kotak-kotak makin besar -> gelap (102.2 -> 103.0),
@@ -150,6 +167,9 @@ void draw() {
         break;
       case 55: 
         transitionFx.trigger(); // Ledakan flash masuk ke room 3
+        break;
+      case 197: 
+        transitionFx.triggerLight(); // Ledakan flash masuk ke room 3
         break;
     }
   }

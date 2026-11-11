@@ -1,7 +1,9 @@
 // =====================================================================
 //  fx_transition.pde   [EFEK VISUAL]
-//  Transisi 1: Layar flash menguning terang.
-//  Transisi 2: Balok hitam menutup dari atas & bawah (Presser).
+//  Transisi 1: Layar flash menguning terang.           -> trigger()
+//  Transisi 2: Balok hitam menutup atas & bawah.       -> triggerPresser()
+//  Transisi 3: Cahaya dari tengah sampai putih penuh.  -> triggerLight()
+//  Semua digambar oleh show() (dipanggil sekali per frame di draw()).
 // =====================================================================
 class FxTransition {
   // Variabel untuk Flash
@@ -14,13 +16,21 @@ class FxTransition {
   float presserSpeed = 20.0; // Kecepatan balok hitam menutup/membuka
   
   int state = 0; // 0: IDLE, 1: CLOSING/RAMP_UP, 2: OPENING/RAMP_DOWN
-  int type = 0;  // 1: Flash Kuning, 2: Presser Hitam
+  int type = 0;  // 1: Flash Kuning, 2: Presser Hitam, 3: Cahaya dari tengah
 
   // Variabel untuk Glitch satu layar
   int glitchDuration = 2;   // lama glitch dalam FRAME (1-2 frame)
   int glitchFrames = 0;     // sisa frame glitch
 
-  FxTransition() {}
+  // Variabel untuk Cahaya dari tengah (dihitung dari BEAT, bukan frame)
+  float lightRise = 3.0;    // lama (beat) dari trigger sampai layar putih penuh
+  float lightFade = 0.8;    // lama (beat) putih memudar sampai hilang
+  float lightStart = 0;     // beatPos saat triggerLight() dipanggil
+  PImage glowImg;           // tekstur gradasi radial (dibuat sekali)
+
+  FxTransition() {
+    buildGlow();
+  }
 
   // Hentikan semua transisi (dipanggil saat RESTART)
   void reset() {
@@ -29,6 +39,7 @@ class FxTransition {
     flashAlpha = 0;
     barHeight = 0;
     glitchFrames = 0;
+    lightStart = 0;
   }
 
   // Glitch satu layar, sangat singkat (glitchDuration frame)
@@ -87,11 +98,20 @@ class FxTransition {
     flashAlpha = 0;
   }
 
-  // Panggil ini untuk transisi Presser Hitam (Baru)
+  // Panggil ini untuk transisi Presser Hitam
   void triggerPresser() {
     state = 1;
     type = 2;
     barHeight = 0;
+  }
+
+  // Panggil ini untuk transisi Cahaya dari tengah.
+  // Mulai dari beat saat dipanggil, putih penuh setelah lightRise beat,
+  // lalu memudar selama lightFade beat.
+  void triggerLight() {
+    state = 1;
+    type = 3;
+    lightStart = clock.beatPos;
   }
 
   void show() {
@@ -151,6 +171,88 @@ class FxTransition {
       rect(0, height - barHeight, width, barHeight);
     }
 
+    // ==========================================
+    // TIPE 3: CAHAYA DARI TENGAH LAYAR
+    // ==========================================
+    else if (type == 3) {
+      drawLight();
+    }
+
     hint(ENABLE_DEPTH_TEST);
+  }
+
+  // Titik cahaya kecil di tengah, makin besar (pelan di awal, melesat di akhir)
+  // sampai layar putih penuh, lalu memudar. Dihitung dari clock.beatPos, jadi
+  // ikut berhenti saat lagu di-pause.
+  void drawLight() {
+    float b = clock.beatPos - lightStart;          // beat sejak trigger
+    if (b < 0 || b >= lightRise + lightFade) {     // selesai (atau lagu di-restart mundur)
+      state = 0;
+      return;
+    }
+
+    float cx = width / 2.0;
+    float cy = height / 2.0;
+    float diag = dist(0, 0, width, height);
+
+    float R, haloA, coreA, washA;
+    if (b < lightRise) {
+      // fase mendekat: p 0 -> 1
+      float p = b / lightRise;
+      float e = p * p * p;                         // pelan dulu, lalu tiba-tiba melesat
+      R     = lerp(40, diag * 1.2, e);             // radius halo (px)
+      haloA = 255 * constrain(p * 4, 0, 1);
+      coreA = 255 * constrain(p * 3, 0, 1);
+      washA = 255 * sstep(0.6, 1.0, p);            // putih penuh menjelang puncak
+    } else {
+      // fase memudar: putih -> hilang
+      float f = 1 - (b - lightRise) / lightFade;
+      R     = diag * 1.2;
+      haloA = 255 * f;
+      coreA = 255 * f;
+      washA = 255 * f;
+    }
+
+    pushStyle();
+
+    // halo besar
+    tint(255, haloA);
+    image(glowImg, cx - R, cy - R, R * 2, R * 2);
+
+    // inti terang di tengah
+    float r2 = R * 0.35;
+    tint(255, coreA);
+    image(glowImg, cx - r2, cy - r2, r2 * 2, r2 * 2);
+    noTint();
+
+    // lapisan putih penuh
+    if (washA > 0) {
+      fill(255, 250, 240, washA);
+      rect(0, 0, width, height);
+    }
+
+    popStyle();
+  }
+
+  // Bikin tekstur gradasi radial putih-hangat: terang di pusat, transparan di tepi
+  void buildGlow() {
+    int n = 256;
+    glowImg = createImage(n, n, ARGB);
+    glowImg.loadPixels();
+    float c = (n - 1) / 2.0;
+    for (int y = 0; y < n; y++) {
+      for (int x = 0; x < n; x++) {
+        float d = dist(x, y, c, c) / c;                      // 0 di pusat, 1 di tepi
+        int a = (int)(pow(constrain(1 - d, 0, 1), 2.0) * 255);
+        glowImg.pixels[y * n + x] = (a << 24) | (255 << 16) | (250 << 8) | 240;
+      }
+    }
+    glowImg.updatePixels();
+  }
+
+  // smoothstep sederhana: 0 sebelum a, 1 setelah b, halus di antaranya
+  float sstep(float a, float b, float x) {
+    float k = constrain((x - a) / (b - a), 0, 1);
+    return k * k * (3 - 2 * k);
   }
 }
