@@ -16,6 +16,7 @@
 //
 //  kinetik = new ElKinetik(fontJepang);        // setup()
 //  kinetik.show(clock, lirik);                 // draw()   (beat 103-135)
+//  kinetik.show(clock, lirik, 128);            // pemakaian ulang: semua jadwal digeser +128 beat (231-263)
 // =====================================================================
 class ImageSlot {
   PImage img;
@@ -35,6 +36,8 @@ class ImageSlot {
 
 class ElKinetik {
   PFont font;
+  boolean tampilKana = false;       // true = huruf lirik raksasa di atas spiral (sekarang dimatikan: spiral murni)
+  int   ofs = 0;                    // geseran beat (0 = adegan asli 103-136; 128 = pengulangan 231-264)
   boolean tampilKarakter = false;   // true kalau udh ada gambar
   float skalaGambar = 0.6;   // 1.0 = ukuran asli, 0.5 = setengah, 0.3 = sepertiga
   ImageSlot sprite1, sprite2, imgSpiral;
@@ -49,6 +52,15 @@ class ElKinetik {
   color spDark = color(106, 89, 45);     // zaitun gelap
   color spGold = color(168, 141, 64);    // emas spiral
   color colC   = color(142, 116, 44);    // kolom emas
+
+  // ---- REDUP BERTAHAP (4 tahap, 1 per beat, mulai di beat ABSOLUT dimMulai; -1 = mati) ----
+  //  tahap 1: latar gelap, kolom emas tetap terlihat tapi redup
+  //  tahap 2: latar makin gelap, kolom emas makin redup
+  //  tahap 3: kolom berubah abu-abu gelap
+  //  tahap 4: semua hitam, tinggal karakter
+  float dimMulai = -1;
+  float[] bgMul = { 1, 0.30, 0.18, 0.10, 0 };                 // kecerahan latar tiap tahap
+  color[] colTahap = { color(142, 116, 44), color(104, 86, 34), color(64, 54, 28), color(38, 36, 32), color(0) };
   color hoodC  = color(66, 61, 47);
   color hairC  = color(8, 7, 5);
   color skinC  = color(186, 174, 132);
@@ -62,14 +74,17 @@ class ElKinetik {
   }
 
   // ---------------------------------------------------------------
-  void show(BeatClock t, ElLirik lk) {
+  void show(BeatClock t, ElLirik lk) { show(t, lk, 0); }
+
+  void show(BeatClock t, ElLirik lk, int geser) {
+    ofs = geser;
     hint(DISABLE_DEPTH_TEST);
     noLights();
     noStroke();
     rectMode(CORNER);
     imageMode(CORNER);
 
-    float b = t.beatPos;
+    float b = t.beatPos - ofs;     // beat relatif terhadap adegan
     float W = width, H = height;
     float punch = pow(1 - t.frac, 3);
     float top = H * 0.178 - punch * 3;
@@ -83,16 +98,16 @@ class ElKinetik {
     if (imgSpiral.ada()) {
       float s = max(W / imgSpiral.img.width, (bot - top) / imgSpiral.img.height);
       pushMatrix();
-      translate(W * 0.45, (top + bot) / 2);
+      translate(W * 0.5, (top + bot) / 2);
       rotate(b * 0.35);
       imageMode(CENTER);
       image(imgSpiral.img, 0, 0, imgSpiral.img.width * s * 2.2, imgSpiral.img.height * s * 2.2);
       imageMode(CORNER);
       popMatrix();
     } else {
-      spiral(W * 0.45, (top + bot) / 2, b, punch);
+      spiral(W * 0.5, (top + bot) / 2, b, punch);
     }
-    kanaRows(t, lk, top, bot - top);
+    if (tampilKana) kanaRows(t, lk, top, bot - top);
 
     // ---- bar letterbox menutup sisa spiral di atas & bawah ----
     fill(barC);
@@ -110,14 +125,32 @@ class ElKinetik {
       kid(x + sl, H * 0.885, H * 0.74 * sc * (1 + pop), b * PI + i * 0.9);
     }
 
+    // ---- redup bertahap: latar digelapkan, kolom & karakter TIDAK ikut ----
+    float L = 0;                                  // 0 normal .. 4 gelap total
+    if (dimMulai >= 0 && t.beatPos >= dimMulai) {
+      float d  = t.beatPos - dimMulai;
+      int   s  = min(3, (int) floor(d));
+      float kk = constrain((d - s) / 0.3, 0, 1);  // meredup halus 0.3 beat tiap tahap
+      L = min(4, s + kk * kk * (3 - 2 * kk));
+    }
+    color colNow = colC;
+    if (L > 0) {
+      int i0 = (int) floor(L), i1 = min(4, i0 + 1);
+      float m = lerp(bgMul[i0], bgMul[i1], L - i0);
+      noStroke();
+      fill(0, 255 * (1 - m));
+      rect(0, 0, W, H);
+      colNow = lerpColor(colTahap[i0], colTahap[i1], L - i0);
+    }
+
     // ---- kolom emas loncat per beat ----
     if (b >= COLUMN_START) {
       int slot = ((int) floor(b - COLUMN_START)) % 4;
       float cw = W / 4.0, x0 = slot * cw;
-      fill(colC);
+      fill(colNow);
       rect(x0, 0, cw, H);
       kid(x0 + cw * 0.5, H * 0.89, H * 0.80 * (1 + punch * 0.03), b * PI);
-      if (t.frac < 0.12) {                                       // kilat tipis saat loncat
+      if (t.frac < 0.12 && L < 2.5) {                                       // kilat tipis saat loncat
         fill(255, 240, 200, 70 * (1 - t.frac / 0.12));
         rect(x0, 0, cw, H);
       }
@@ -153,7 +186,7 @@ class ElKinetik {
   void kanaRows(BeatClock t, ElLirik lk, float top, float h) {
     String cur = "";
     for (int i = 0; i < lk.lirik.length; i++) {
-      if (lk.lirikBeat[i] >= 104 && t.inBeat(lk.lirikBeat[i], lk.lirikBeat[i] + lk.durasiLirik[i])) cur = lk.lirik[i];
+      if (lk.lirikBeat[i] >= 104 + ofs && t.inBeat(lk.lirikBeat[i], lk.lirikBeat[i] + lk.durasiLirik[i])) cur = lk.lirik[i];
     }
     cur = cur.replace(" ", "").replace("　", "");
     if (cur.length() == 0) cur = "くりかえす";
@@ -162,7 +195,7 @@ class ElKinetik {
     textFont(font);
     textAlign(CENTER, CENTER);
     float sp = 92;
-    float scroll = t.beatPos * 22;
+    float scroll = (t.beatPos - ofs) * 22;
     int shift = (int) floor(scroll / sp);
     float fx = scroll - shift * sp;
     fill(150, 142, 116, 200);

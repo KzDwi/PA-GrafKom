@@ -105,6 +105,65 @@ environment) - expect to fix small compile/runtime errors first.
              Room 3 (beat 56-72) tetap memakai style 0 terang seperti sebelumnya.
           -> BELUM dikompilasi/dijalankan.
 
+[Tahap 10] Adegan "Help Me" (beat 227.5 -> 231).
+          -> el_HelpMe.pde (ElHelpMe, 2D overlay): zoom cepat ke pintu (subBeat 455-456, foto layar
+             di-zoom 16x dari titik pintu + zoom blur), lalu layar hitam + distorsi putih (garis acak,
+             bintik, balok tracking, goresan vertikal, kilap tipis). Teks Base64 "Help Me" (SGVscCBNZQ==)
+             muncul 3 subBeat sesudah hitam (subBeat 459 = beat 229.5), huruf menyala satu-satu dari
+             distorsi, bergetar & membesar pelan sampai beat 231. Jadwal = konstanta di atas class.
+          -> pa_mv.pde: helpMe dideklarasi/dibuat/dipanggil (setelah mosaicFx, sebelum UI); latar 3D
+             beat 228-231 dikosongkan; bola & lirik disembunyikan sampai beat 231.
+          -> el_LorongCahaya.pde: field sembunyiTeks (lirik disembunyikan mulai beat 227.5).
+          -> BELUM dikompilasi/dijalankan. Setelah beat 231 layar jatuh ke latar default (backroomStatic 0).
+
+[Tahap 11] Revisi adegan "Help Me" + pengulangan adegan kinetik.
+          -> el_HelpMe.pde: 3-5 huruf Base64 berwarna merah (dipilih acak, diacak ulang tiap subBeat;
+             RED_MIN/RED_MAX). Garis distorsi memudar perlahan dari FADE_START=230 sampai hilang di 231
+             (pengali am; jumlah & alpha garis turun).
+          -> el_Kinetik.pde: show(t, lk, geser) -> semua jadwal/lirik digeser. Beat 231-263 = beat 103-135 + 128.
+          -> pa_mv.pde: kinetik.show(clock, lirik, 128) + efekVHS di beat 231-264; mosaik masuk 231.0-231.6
+             (dari hitam Help Me); glitch di subBeat 494 & 527 (= 238 & 271 + 256). Bola disembunyikan sampai 264.
+          -> BELUM dikompilasi/dijalankan.
+
+[Tahap 12] Redup bertahap di adegan kinetik ke-2 (beat 260-263).
+          -> el_Kinetik.pde: field dimMulai/bgMul/colTahap. 4 tahap, 1 per beat (mengikuti loncatan kolom emas):
+             1 latar gelap (kolom emas redup), 2 makin gelap, 3 kolom abu-abu, 4 hitam total + karakter saja.
+          -> pa_mv.pde setup(): kinetik.dimMulai = 260.  BELUM dikompilasi/dijalankan.
+
+[Tahap 13] Spiral dirapikan + adegan spiral zoom + layar hitam kata akhir.
+          -> el_Kinetik.pde: spiral dipusatkan (x = 0.5 lebar), huruf Jepang di atas spiral dimatikan (tampilKana=false).
+          -> el_SpiralZoom.pde (beat 264-290): spiral full layar; kamera zoom ke kiri-bawah (264-272), pindah ke
+             atas-kanan (272-280), kembali semula (280-290). Konstanta kamera di atas class.
+          -> el_KataAkhir.pde (beat 290-297): hitam + distorsi tipis dari atas; lirik beat 292 muncul huruf demi
+             huruf (0.4 beat/huruf), jadi merah di beat 296. Mosaik penutup 289-290 di pa_mv.pde.
+          -> BELUM dikompilasi/dijalankan.
+
+[Tahap 14] el_SpiralZoom.pde: perpindahan kamera (264, 272, 280) jadi CUT langsung, tanpa animasi zoom/transisi.
+          Kamera diam per segmen (DRIFT = 0). BELUM dikompilasi/dijalankan.
+
+[Tahap 15 - revisi: kartu emas kecoklatan transparan, ruangan tetap ganti per beat di 312-328]
+          [Tahap 15] Beat 297-328: ruangan 3D per beat + kolom negatif.
+          -> el_RuangBeat.pde (ElRuangBeat extends ElBackroomStatic): 16 ruangan (pool, hotel merah, kantor, garasi, sekolah,
+             ruang tamu 70-an, ruang bola, gudang, neon, toilet, perpus, kamar anak, aula pilar, lobi lift, ruang putih
+             pintu merah, Level 0 kuning besar). Beat 297-311 = ruang 0-14 (1 per beat), beat 312-327 = ruang 15 ditahan + dorong maju pelan.
+          -> el_KolomNegatif.pde: kolom 1/4 layar loncat per beat (312-328), warna = negatif latar, alpha rendah (alphaMax=95).
+          -> pa_mv.pde: deklarasi/setup, rantai latar 3D, bola disembunyikan sampai 328, mosaik 296.35-297.7.
+          -> Tampilan dicek lewat mock + rasterizer (bukan Processing asli); BELUM dijalankan di Processing.
+
+[Tahap 16] Kartu dipertebal (alphaMax 170) + error 328-329 + adegan bingkai blur -> TV.
+          -> el_RuangTV.pde (ElRuangTV): beat 329-343 gambar ruangan (ganti per beat, urutan di array urut) di-BLUR dalam bingkai 4:3,
+             zoom out pelan sampai seukuran layar TV; 343-344.5 error hitam-putih kotak-kotak lalu TV muncul & menyala; 344.5-... TV tetap
+             tayang (isi = ruangan ganti per beat, blur kuat + redup 0.55, latar gelap, cahaya TV mengikuti warna rata-rata ruangan).
+          -> el_RuangBeat.pde: field tempel (false = jangan tempel ke layar; hasil diambil lewat cv.pg).
+          -> pa_mv.pde: glitch subBeat 656/657/658 (328-329) dan 686/687 (343-343.5); bola hanya tampil beat < 168.
+          -> Adegan TV BELUM ada akhirnya (terbuka sampai lagu habis) - atur kalau tahap berikut sudah ditentukan.
+          -> Bagian 2D hanya dicek lewat kompilasi + sketsa tata letak, BELUM dijalankan di Processing.
+
+[Tahap 17] Beat 356: TV mati (el_RuangTV.showMati, 0.8 beat): layar redup dari pinggir ke tengah + menipis jadi garis,
+          kilau memanjang + bintang putih, cahaya TV menggelap sampai HITAM PENUH di beat 357 (tinggal judul LOOPING THE ROOM).
+          Konstanta OFF_MULAI / OFF_DUR di el_RuangTV.pde. Setelah 357 ElRuangTV tidak menggambar apa-apa.
+          BELUM dijalankan di Processing.
+
 =====================================================================
  3. STATUS SAAT INI
 =====================================================================

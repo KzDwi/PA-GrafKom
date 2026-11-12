@@ -28,6 +28,12 @@ FxMosaic     mosaicFx;
 FxRiser      riser;       
 ElVoidFall   voidFall;
 ElLorongCahaya lorongCahaya;
+ElHelpMe    helpMe;
+ElSpiralZoom spiralZoom;
+ElKataAkhir  kataAkhir;
+ElRuangBeat  ruangBeat;
+ElKolomNegatif kolomNeg;
+ElRuangTV    ruangTV;
 
 void setup() {
   size(1280, 720, P3D);
@@ -56,9 +62,16 @@ void setup() {
   doorLoop  = new ElDoorLoop();
   kinetik   = new ElKinetik(fontJepang);
   mosaicFx = new FxMosaic();
+  kinetik.dimMulai = 260;   // adegan kinetik ke-2: beat 260-263 = 4 tahap redup (kolom emas pindah kiri -> kanan)
   riser     = new FxRiser(this, 100, 103);   
   voidFall  = new ElVoidFall();
   lorongCahaya = new ElLorongCahaya(fontJepang);
+  helpMe       = new ElHelpMe();
+  spiralZoom   = new ElSpiralZoom();
+  kataAkhir    = new ElKataAkhir(fontJepang);
+  ruangBeat    = new ElRuangBeat();
+  kolomNeg     = new ElKolomNegatif();
+  ruangTV      = new ElRuangTV(ruangBeat);
 }
 
 void draw() {
@@ -85,12 +98,19 @@ void draw() {
   else if (clock.inBeat(194, 200))   voidFall.show3D(clock, 3); // Scene 3: Tabrakan/Transisi
   
   else if (clock.inBeat(200, 228)) lorongCahaya.show3D(clock);
+  else if (clock.inBeat(264, 297)) { /* latar = spiral zoom 2D (264-290) lalu layar hitam kata akhir (290-297) */ }
+  else if (clock.inBeat(231, 264)) { /* latar = adegan kinetik 2D ke-2 (pemakaian ulang, geser +128 beat) */ }
+  else if (clock.inBeat(228, 231)) { /* latar = layar hitam 'Help Me' (digambar helpMe di bagian akhir) */ }
+  else if (clock.inBeat(297, 329)) ruangBeat.show(clock, 297, 312, 328);   // beat 297-328: 1 ruangan Backrooms per beat (kartu emas di 312-328, error di 328-329)
+  else if (clock.beat >= 329) { /* latar = adegan bingkai blur -> TV (ruangTV, 2D, digambar di bagian 2D) */ }
   
   else                             backroomStatic.show(clock, 0); // Waktu kosong / sisanya: Default (ruang statis 0)
 
   // ===================== 2. ELEMENT 2D (boleh numpuk/overlap) =====================
   // Urutan panggil = urutan tumpukan (yang terakhir paling depan)
-  if (!clock.inBeat(100, 136) && !clock.inBeat(168, 228)) bola.show(clock); // bola disembunyikan di adegan pintu & kinetik
+  if (clock.inBeat(312, 328)) kolomNeg.show(clock, 312, 328);   // kartu emas transparan loncat per beat (ruangan tetap ganti tiap beat) (di atas latar 3D, di bawah teks)
+
+  if (!clock.inBeat(100, 136) && clock.beat < 168) bola.show(clock); // bola disembunyikan di adegan pintu & kinetik
   if (clock.inBeat(0, 200)) poli.show(clock);      // beat 0-199
   
   //40,47
@@ -119,21 +139,41 @@ void draw() {
   // , beat 103-136
   if (clock.inBeat(103, 136)) kinetik.show(clock, lirik);
   if (clock.inBeat(100, 136)) efekVHS.show(clock);  // grain/scanline di pintu & kinetik
+
+  // pengulangan adegan kinetik (spiral "Kurikaesu"): beat 231-263 = beat 103-135 digeser +128
+  if (clock.inBeat(231, 264)) kinetik.show(clock, lirik, 128);
+  if (clock.inBeat(231, 264)) efekVHS.show(clock);
+
+  // beat 264-289: spiral FULL layar + kamera zoom (kiri-bawah -> atas-kanan -> semula)
+  if (clock.inBeat(264, 290)) { spiralZoom.show(clock, kinetik); efekVHS.show(clock); }
   
+  lorongCahaya.sembunyiTeks = (clock.beatPos >= 227.5);   // subBeat 455: teks lirik hilang saat zoom ke pintu
   if (clock.inBeat(200, 228)) lorongCahaya.show2D(clock, lirik);
   
   if (clock.inBeat(168, 194)) {
     voidFall.show2D(clock); // Otomatis menyesuaikan scene yang diset oleh show3D
   }
 
+  // beat 329-343 bingkai blur zoom out -> 343-344.5 error hitam-putih -> TV menyala (ruangan ganti tiap beat, blur + redup)
+  if (clock.beat >= 329) ruangTV.show(clock);
+
   transitionFx.show();
   judul.show(clock);
-  if (!clock.inBeat(200, 228)) lirik.show(clock);                            // timing lirik diatur di el_Teks.pde
+  if (!clock.inBeat(200, 231)) lirik.show(clock);                            // timing lirik diatur di el_Teks.pde
   transitionFx.showGlitch();                       // glitch satu layar (di atas semua, di bawah UI)
 
   // Transisi mozaik "TV rabun": pintu -> kotak-kotak makin besar -> gelap (102.2 -> 103.0),
   // lalu adegan baru muncul dari kotak besar -> jelas (103.0 -> 103.6)
   mosaicFx.show(clock, 102.2, 103.0, 103.0, 103.6);
+
+  // Beat 227.5 (subBeat 455) -> 231: zoom ke pintu, layar hitam + distorsi putih, teks Base64 "Help Me"
+  helpMe.show(clock);
+  mosaicFx.show(clock, 9999, 9999, 231.0, 231.6);   // dari hitam 'Help Me' -> kotak besar -> adegan kinetik ke-2 jelas
+  if (clock.beatPos < 290) mosaicFx.show(clock, 289.0, 290.0, 9999, 9999);   // spiral -> kotak besar -> hitam (beat 289-290)
+  mosaicFx.show(clock, 296.35, 297.0, 297.0, 297.7);   // kata akhir merah -> kotak besar -> ruangan 3D (beat 297)
+
+  // Beat 290-297: layar hitam, distorsi tipis dari atas, lirik muncul huruf demi huruf, jadi merah di beat 296
+  if (clock.inBeat(290, 297)) kataAkhir.show(clock, lirik);
   //riser.update(clock, kontrol.isPlaying);          // suara naik beat 100-103 (diam saat pause)
   
 
@@ -158,6 +198,14 @@ void draw() {
   if (clock.atSubBeat(203)) transitionFx.triggerGlitch();  // Beat 101.5: 
   if (clock.atSubBeat(238)) transitionFx.triggerGlitch();  // Beat 117.5:
   if (clock.atSubBeat(271)) transitionFx.triggerGlitch();  // Beat 136  : 
+  if (clock.atSubBeat(494)) transitionFx.triggerGlitch();  // Beat 247  : (= 238 + 256, kinetik ke-2)
+  if (clock.atSubBeat(527)) transitionFx.triggerGlitch();  // Beat 263.5: (= 271 + 256, kinetik ke-2)
+  // error singkat di akhir scene kartu (beat 328-329) dan di awal error TV (beat 343-343.5)
+  if (clock.atSubBeat(656)) transitionFx.triggerGlitch();   // Beat 328
+  if (clock.atSubBeat(657)) transitionFx.triggerGlitch();   // Beat 328.5
+  if (clock.atSubBeat(658)) transitionFx.triggerGlitch();   // Beat 329 : bingkai muncul
+  if (clock.atSubBeat(686)) transitionFx.triggerGlitch();   // Beat 343 : mulai error hitam-putih
+  if (clock.atSubBeat(687)) transitionFx.triggerGlitch();   // Beat 343.5
   // (posisi anak untuk tiap teleport diatur di el_tvstatic.pde -> boySub / boyStartX)
 
   if (clock.newBeat) {

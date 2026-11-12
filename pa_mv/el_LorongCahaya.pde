@@ -37,6 +37,7 @@ class ElLorongCahaya {
   int   tembakan;    // nomor kilat (untuk variasi lorong)
   float lebarLorong = 140;
   float camX, camY;
+  boolean sembunyiTeks = false;   // true = teks lirik tidak digambar (dipakai adegan ElHelpMe)
 
   ElLorongCahaya(PFont font) {
     this.font = font;
@@ -68,7 +69,7 @@ class ElLorongCahaya {
     if (fase < 2) drawOrb();
     else          drawGlitch(t);
 
-    drawText(t, l);
+    if (!sembunyiTeks) drawText(t, l);
 
     hint(ENABLE_DEPTH_TEST);
     popStyle();
