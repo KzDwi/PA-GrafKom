@@ -1,63 +1,71 @@
 // =====================================================================
 //  el_RuangBeat.pde   [ELEMENT 3D - LATAR]   beat 297 -> 328
-//  16 ruangan Backrooms BERBEDA, kamera hampir diam (hanya dorong maju pelan
+//  16 ruangan Backrooms BERBEDA, kamera hampir diam (dorong maju pelan
 //  + hentakan FOV tiap beat). Memakai mesin pencahayaan ElBackroomStatic
 //  (class ini turunannya), jadi lampu titik berwarna + kabut + vignette sama.
 //
-//    0 Poolrooms (kolam ubin)      8 Koridor neon
-//    1 Lorong hotel merah          9 Kamar mandi ubin
-//    2 Kantor kubikel             10 Perpustakaan
-//    3 Garasi parkir beton        11 Kamar anak (lampu tidur)
-//    4 Koridor sekolah + loker    12 Aula pilar gelap
-//    5 Ruang tamu 70-an + TV      13 Lobi lift marmer
-//    6 Ruang bola ungu + perosotan 14 Ruang putih, pintu merah
-//    7 Gudang rak tak berujung    15 Level 0 kuning besar (ruang penutup)
+//  Daftar ruangan (indeks):
+//    0  Poolrooms (kolam ubin)        8  Koridor neon
+//    1  Lorong hotel merah            9  Kamar mandi ubin
+//    2  Kantor kubikel               10  Perpustakaan
+//    3  Garasi parkir beton          11  Kamar anak (lampu tidur)
+//    4  Koridor sekolah + loker      12  Aula pilar gelap
+//    5  Ruang tamu 70-an + TV        13  Lobi lift marmer
+//    6  Ruang bola ungu + perosotan  14  Ruang putih, pintu merah
+//    7  Gudang rak tak berujung      15  Level 0 kuning besar (ruang penutup)
 //
-//  ruangBeat = new ElRuangBeat();                  
-//  ruangBeat.show(clock, 297, 312, 328);                
-//     beat mulai..akhirGanti : ruang 0..14 berurutan,  akhirGanti..akhir : 16 ruangan urutan lain
+//  Pemakaian:
+//    ruangBeat = new ElRuangBeat();
+//    ruangBeat.show(clock, 297, 312, 328);
+//      beat mulai..akhirGanti : ruang 0..14 berurutan
+//      beat akhirGanti..akhir : 16 ruangan urutan lain (mulai dari ruang 15)
 // =====================================================================
 class ElRuangBeat extends ElBackroomStatic {
-  final int JUMLAH = 16;
-  float tb = 0;          // beatPos
-  float vigK = 1.0;      // kekuatan vignette
-  boolean tempel = true; // false = hasil 3D TIDAK ditempel ke layar (dipakai ElRuangTV lewat cv.pg)
+  final int JUMLAH = 16;    // jumlah ruangan tersedia
+  float tb = 0;             // salinan beatPos (dipakai di fungsi ruangan)
+  float vigK = 1.0;         // kekuatan vignette
+  boolean tempel = true;    // false = hasil 3D TIDAK ditempel ke layar (dipakai ElRuangTV)
 
   ElRuangBeat() {
     lampX = new float[24]; lampY = new float[24]; lampZ = new float[24];
     lampI = new float[24]; lampRad = new float[24];
     lampR = new float[24]; lampG = new float[24]; lampB = new float[24];
-    kedip = 0.35;
+    kedip = 0.35;           // kekuatan kedip lampu per beat
   }
 
+  // Wrapper: tambahkan lampu selama kapasitas array masih cukup
   void addLamp(float x, float y, float z, float inten, float rad, float r, float gr, float b) {
     if (nL >= lampX.length) return;
     super.addLamp(x, y, z, inten, rad, r, gr, b);
   }
 
   // ------------------------------------------------------------------
+  // Jadwal ruangan:
+  //   beat mulai..akhirGanti-1 : ruang 0..14 berurutan
+  //   beat akhirGanti..akhir-1 : ganti tiap beat, urutan `urut` (ruang 15 di depan)
+  // ------------------------------------------------------------------
   void show(BeatClock t, int mulai, int akhirGanti, int akhir) {
-    // beat mulai..akhirGanti-1 : ruang 0..14 berurutan
-    // beat akhirGanti..akhir-1 : tetap ganti tiap beat, urutan acak (ruang 15 = kuning besar di beat pertama)
     int[] urut = { 15, 7, 12, 1, 9, 4, 13, 0, 10, 5, 14, 2, 8, 11, 3, 6 };
     int idx = (t.beat < akhirGanti) ? t.beat - mulai : urut[(t.beat - akhirGanti) % urut.length];
     showRuang(t, idx, t.frac, 70);
   }
 
+  // Render satu ruangan berdasarkan indeks.
+  // `u` = progres dalam beat (0..1), `dolly` = dorong maju kamera (px).
   void showRuang(BeatClock t, int idx, float u, float dolly) {
     g = cv.begin();
     nL = 0;
     tb = t.beatPos;
     vigK = 0.8;
-    pulse = 1 + kedip * pow(1 - t.frac, 4);
+    pulse = 1 + kedip * pow(1 - t.frac, 4);   // denyut kecil tiap beat
     float punch = pow(1 - t.frac, 3);
 
     g.background(0);
     g.noLights();
     g.noStroke();
     g.perspective(radians(62) - punch * 0.04, (float) g.width / g.height, 5, 4300);
-    float zc = -dolly * u;
-    float sx = sin(tb * 0.7) * 5, sy = sin(tb * 1.1 + 1) * 3;
+    float zc = -dolly * u;                    // posisi kamera sepanjang z
+    float sx = sin(tb * 0.7) * 5, sy = sin(tb * 1.1 + 1) * 3;   // goyang kamera halus
     g.camera(sx, sy, zc,   sx * 0.4, 25 + sy, zc - 1000,   0, 1, 0);
 
     gelap = 0.95;
@@ -87,30 +95,37 @@ class ElRuangBeat extends ElBackroomStatic {
   // =====================================================================
   //  PEMBANTU
   // =====================================================================
+  // Kalikan warna dengan faktor k (clamp ke 0..255)
   color mulc(color c, float k) {
     return color(constrain(red(c) * k, 0, 255), constrain(green(c) * k, 0, 255), constrain(blue(c) * k, 0, 255));
   }
+
+  // Interpolasi linear dua warna
   color mixc(color a, color b, float t) {
     return color(lerp(red(a), red(b), t), lerp(green(a), green(b), t), lerp(blue(a), blue(b), t));
   }
-  // warna emisif ikut kabut jarak
+
+  // Warna emisif ikut kabut jarak
   color fogc(color c, float z) {
     return mulc(c, pulse * (1 - 0.6 * constrain((-z - 300) / 2400.0f, 0, 1)));
   }
 
-  // bidang tegak menghadap kamera (z tetap)
+  // Bidang tegak menghadap kamera (z tetap)
   void qZ(color c, float sh, int nu, int nv, float x0, float x1, float y0, float y1, float z) {
     quadN(c, sh, nu, nv, x0, y0, z, x1, y0, z, x1, y1, z, x0, y1, z);
   }
-  // bidang tegak di samping (x tetap), memanjang di z
+
+  // Bidang tegak di samping (x tetap), memanjang di z
   void qX(color c, float sh, int nu, int nv, float x, float y0, float y1, float z0, float z1) {
     quadN(c, sh, nu, nv, x, y0, z0, x, y0, z1, x, y1, z1, x, y1, z0);
   }
-  // bidang datar (y tetap)
+
+  // Bidang datar (y tetap)
   void qY(color c, float sh, int nu, int nv, float y, float x0, float x1, float z0, float z1) {
     quadN(c, sh, nu, nv, x0, y, z0, x1, y, z0, x1, y, z1, x0, y, z1);
   }
-  // balok (z0 = sisi jauh, z1 = sisi dekat, y0 = atas)
+
+  // Balok (z0 = sisi jauh, z1 = sisi dekat, y0 = atas)
   void boxN(color c, float x0, float x1, float y0, float y1, float z0, float z1, int nu, int nv) {
     qZ(c, 1.0, nu, nv, x0, x1, y0, y1, z1);
     qX(c, 0.62, nu, nv, x0, y0, y1, z0, z1);
@@ -118,16 +133,22 @@ class ElRuangBeat extends ElBackroomStatic {
     qY(c, 1.0, nu, nu, y0, x0, x1, z0, z1);
     qY(c, 0.5, 1, 1, y1, x0, x1, z0, z1);
   }
-  // ---- mode batch: satu beginShape untuk banyak quad (jauh lebih ringan) ----
+
+  // ---- mode batch: satu beginShape untuk banyak quad (lebih ringan) ----
   void bBegin() { g.beginShape(QUADS); }
   void bEnd()   { g.endShape(); }
+
   void bQ(color c, float sh, float x1, float y1, float z1, float x2, float y2, float z2,
           float x3, float y3, float z3, float x4, float y4, float z4) {
     v(c, sh, x1, y1, z1); v(c, sh, x2, y2, z2); v(c, sh, x3, y3, z3); v(c, sh, x4, y4, z4);
   }
-  void bTileY(color c, float y, float x0, float x1, float z0, float z1) {   // petak lantai
+
+  // Petak lantai
+  void bTileY(color c, float y, float x0, float x1, float z0, float z1) {
     bQ(c, 1.0, x0, y, z0, x1, y, z0, x1, y, z1, x0, y, z1);
   }
+
+  // Balok dengan `nv` pita vertikal (untuk pencahayaan halus)
   void bBox(color c, float x0, float x1, float y0, float y1, float z0, float z1, int nv) {
     for (int i = 0; i < nv; i++) {
       float a = lerp(y0, y1, i / (float) nv), b = lerp(y0, y1, (i + 1) / (float) nv);
@@ -137,7 +158,8 @@ class ElRuangBeat extends ElBackroomStatic {
     }
     bQ(c, 1.0, x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1);
   }
-  // garis berpencahayaan (dipecah supaya cahaya halus)
+
+  // Garis berpencahayaan (dipecah supaya cahaya halus)
   void ln(color c, float sh, float x1, float y1, float z1, float x2, float y2, float z2, float w) {
     float L = dist(x1, y1, z1, x2, y2, z2);
     int n = max(1, (int) ceil(L / 220.0f));
@@ -151,12 +173,13 @@ class ElRuangBeat extends ElBackroomStatic {
     }
     g.noStroke();
   }
-  // bola low-poly
+
+  // Bola low-poly
   void ball(float cx, float cy, float cz, float r, color c) {
     int ns = 7, nt = 4;
     for (int j = 0; j < nt; j++) {
       float p0 = -HALF_PI + PI * j / nt, p1 = -HALF_PI + PI * (j + 1) / nt;
-      float sh = 0.45 + 0.55 * max(0, -sin((p0 + p1) / 2));
+      float sh = 0.45 + 0.55 * max(0, -sin((p0 + p1) / 2));   // shading berdasarkan lintang
       for (int i = 0; i < ns; i++) {
         float a0 = TWO_PI * i / ns, a1 = TWO_PI * (i + 1) / ns;
         v(c, sh, cx + r * cos(p0) * cos(a0), cy + r * sin(p0), cz + r * cos(p0) * sin(a0));
@@ -166,15 +189,17 @@ class ElRuangBeat extends ElBackroomStatic {
       }
     }
   }
-  // quad emisif (tidak kena lampu) + kabut
+
+  // Quad emisif (tidak kena lampu) + kabut
   void em(color c, float x1, float y1, float z1, float x2, float y2, float z2,
           float x3, float y3, float z3, float x4, float y4, float z4) {
     quadFlat(fogc(c, (z1 + z3) / 2), x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4);
   }
   void emZ(color c, float x0, float x1, float y0, float y1, float z) { em(c, x0, y0, z, x1, y0, z, x1, y1, z, x0, y1, z); }
-  void emY(color c, float y, float x0, float x1, float z0, float z1) { em(c, x0, y, z0, x1, y, z0, x1, y, z1, x0, y, z1); }
-  void emX(color c, float x, float y0, float y1, float z0, float z1) { em(c, x, y0, z0, x, y0, z1, x, y1, z1, x, y1, z0); }
+  void emY(color c, float y, float x0, float x1, float z0, float z1)   { em(c, x0, y, z0, x1, y, z0, x1, y, z1, x0, y, z1); }
+  void emX(color c, float x, float y0, float y1, float z0, float z1)   { em(c, x, y0, z0, x, y0, z1, x, y1, z1, x, y1, z0); }
 
+  // Vignette 2D: gelap di tepi, terang di tengah
   void vig(float k) {
     g.camera();
     g.perspective();

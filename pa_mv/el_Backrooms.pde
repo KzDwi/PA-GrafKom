@@ -6,47 +6,48 @@
 //  Ruangan 3D ala Backrooms. Dirender ke kanvas terpisah (Canvas3D),
 //  jadi tidak bisa nembus element 2D.
 //
-//  backrooms = new ElBackrooms();                 // di setup()
-//  backrooms.show(clock, palette);                // di draw()
-//  palette: 0 = kuning, 1 = abu-abu, 2 = ungu
+//  Pemakaian:
+//    backrooms = new ElBackrooms();                 // di setup()
+//    backrooms.show(clock, palette);                // di draw()
+//    palette: 0 = kuning, 1 = abu-abu, 2 = ungu
 //
-//  UPDATE:
-//   - ElBackrooms: pencahayaan HD per-vertex (tiap lampu panel jadi lampu
-//     titik sungguhan: kolam cahaya di lantai, gradasi di dinding, pantulan
-//     glossy di lantai, AO di sudut, glow lampu, lampu rusak berkedip,
-//     tone-mapping, vignette) + detail: plint, wainscot, crown, sambungan karpet.
-//   - ElBackroomStatic: tiap ruangan ditambah banyak detail (trim, grid
-//     plafon, ubin lantai, bayangan sudut, glow lampu, debu, dekorasi, dll).
+//  Fitur:
+//   - ElBackrooms: pencahayaan HD per-vertex (lampu panel jadi lampu titik:
+//     kolam cahaya di lantai, gradasi di dinding, pantulan glossy di lantai,
+//     AO di sudut, glow lampu, lampu rusak berkedip, tone-mapping, vignette)
+//     + detail: plint, wainscot, crown, sambungan karpet.
+//   - ElBackroomStatic: tiap ruangan punya banyak detail (trim, grid
+//     plafon, ubin lantai, bayangan sudut, glow lampu, debu, dekorasi).
 // =====================================================================
 class ElBackrooms {
   // ---- pengaturan ----
-  final float CELL          = 500;    // panjang 1 segmen lorong
-  final float HALF          = 650;    // setengah lebar ruangan
-  final float FLOOR         = 150;    // y lantai
-  final float CEIL          = -170;   // y plafon
-  final float VIEW          = 4800;   // jarak pandang sebelum hilang ke kabut
+  final float CELL           = 500;   // panjang 1 segmen lorong
+  final float HALF           = 650;   // setengah lebar ruangan
+  final float FLOOR          = 150;   // y lantai
+  final float CEIL           = -170;  // y plafon
+  final float VIEW           = 4800;  // jarak pandang sebelum hilang ke kabut
   final float UNITS_PER_BEAT = 300;   // kecepatan maju kamera per beat
 
   // ---- pengaturan pencahayaan ----
   final float LAMP_I    = 1.7;   // kekuatan tiap lampu
   final float LAMP_R    = 420;   // radius jatuh cahaya lampu
   final float LAMP_DROP = 20;    // lampu "menggantung" sekian unit di bawah plafon
-  final float AMB       = 0.30;  // cahaya ambient
+  final float AMB       = 0.30;  // kekuatan cahaya ambient
   final float VIG       = 150;   // kekuatan vignette (0 = mati, 255 = pekat)
 
-  color wall, floorC, ceilC, lamp, bg;
-  float travel = 0;
+  color wall, floorC, ceilC, lamp, bg;   // warna palet ruangan aktif
+  float travel = 0;                       // jarak kamera sudah berjalan (world unit)
 
   // keadaan frame saat ini
   float camX = 0, camY = 0, camZ = 0;   // posisi kamera (koordinat lokal geometri)
-  float beatT = 0;
-  float lampPunch = 1;
-  float lr = 1, lg = 1, lb = 1;         // warna lampu 0..1
-  int   curK = 0;                       // segmen yang sedang digambar
-  float gloss = 0;                      // >0 : permukaan mengkilap (lantai)
+  float beatT = 0;                      // salinan beatPos
+  float lampPunch = 1;                  // pengali kekuatan lampu (denyut tiap beat)
+  float lr = 1, lg = 1, lb = 1;         // warna lampu sebagai fraksi 0..1
+  int   curK = 0;                       // indeks segmen yang sedang digambar
+  float gloss = 0;                      // >0 = permukaan mengkilap (lantai)
 
-  Canvas3D cv = new Canvas3D();   // kanvas 3D terpisah
-  PGraphics g;                    // dipakai semua method gambar di bawah
+  Canvas3D cv = new Canvas3D();         // kanvas 3D terpisah
+  PGraphics g;                          // dipakai semua method gambar di bawah
 
   void show(BeatClock t, int palette) {
     setPalette(palette);
@@ -54,13 +55,13 @@ class ElBackrooms {
 
     g = cv.begin();
     beatT  = t.beatPos;
-    travel = t.beatPos * UNITS_PER_BEAT;    // posisi kamera mengikuti lagu
+    travel = t.beatPos * UNITS_PER_BEAT;    // kamera mengikuti lagu
 
     // gerakan kamera sinkron beat
     float punch = pow(1 - t.frac, 4);
-    float sway  = sin(t.beatPos * PI * 0.5) * 35;
-    float bob   = -abs(sin(t.beatPos * PI)) * 10;
-    float roll  = sin(t.beatPos * PI * 0.25) * 0.04
+    float sway  = sin(t.beatPos * PI * 0.5) * 35;              // goyang horizontal
+    float bob   = -abs(sin(t.beatPos * PI)) * 10;              // naik-turun vertikal
+    float roll  = sin(t.beatPos * PI * 0.25) * 0.04            // kemiringan halus
                 + ((t.beat % 2 == 0) ? 1 : -1) * punch * 0.03;
     float fov   = radians(65) - punch * 0.07;
     lampPunch = 1 + punch * 0.10;
@@ -78,8 +79,8 @@ class ElBackrooms {
     g.pushMatrix();
     g.translate(0, 0, travel);
     g.noStroke();
-    int k0 = (int) floor(travel / CELL) - 1;
-    int n  = (int) ceil(VIEW / CELL) + 2;
+    int k0 = (int) floor(travel / CELL) - 1;                   // segmen pertama (dekat kamera)
+    int n  = (int) ceil(VIEW / CELL) + 2;                      // jumlah segmen digambar
     for (int k = k0; k < k0 + n; k++) cell(k);
 
     // pass kedua: glow lampu (additive, digambar setelah semua benda solid)
@@ -97,9 +98,9 @@ class ElBackrooms {
   // ---------- isi 1 segmen ----------
   void cell(int k) {
     curK = k;
-    float z0 = -k * CELL;
-    float z1 = z0 - CELL;
-    float zc = z0 - CELL * 0.5;
+    float z0 = -k * CELL;               // z sisi depan segmen
+    float z1 = z0 - CELL;               // z sisi belakang segmen
+    float zc = z0 - CELL * 0.5;         // z tengah segmen
 
     // ---- lantai (glossy, kena pantulan lampu) ----
     gloss = 0.55;
@@ -170,7 +171,7 @@ class ElBackrooms {
 
   // ---------- LAMPU ----------
   float lampX(int k, int i) {
-    float lx = (k % 2 == 0) ? -230 : 230;
+    float lx = (k % 2 == 0) ? -230 : 230;   // posisi X lampu bergantian tiap segmen
     return (i == 0) ? lx : -lx;
   }
 
@@ -179,7 +180,7 @@ class ElBackrooms {
     return (i == 0) ? zc + 110 : zc - 110;
   }
 
-  // sebagian lampu rusak dan berkedip
+  // Sebagian lampu dibuat "rusak" dan berkedip
   float lampGain(int k, int i) {
     float h = hash(k, 40 + i);
     if (h < 0.15) {
@@ -206,7 +207,7 @@ class ElBackrooms {
     g.noStroke();
   }
 
-  // glow lembut di sekitar lampu (additive)
+  // Glow lembut di sekitar lampu (additive)
   void halo(int k) {
     for (int i = 0; i < 2; i++) {
       float cx = lampX(k, i), cz = lampZ(k, i);
@@ -227,10 +228,10 @@ class ElBackrooms {
   }
 
   // ---------- PENCAHAYAAN ----------
-  // warna akhir titik: ambient + 6 lampu terdekat (diffuse + spekular) + AO + tone-map + kabut
+  // Warna akhir titik: ambient + 6 lampu terdekat (diffuse + spekular) + AO + tone-map + kabut
   color lit(color c, float s, float x, float y, float z, float nx, float ny, float nz) {
     float mr = AMB * lr, mg = AMB * lg, mb = AMB * lb;
-    float sp = 0;
+    float sp = 0;                                       // komponen spekular
     for (int kk = curK - 1; kk <= curK + 1; kk++) {
       for (int i = 0; i < 2; i++) {
         float dx = lampX(kk, i) - x;
@@ -275,7 +276,7 @@ class ElBackrooms {
     return fog(color(tm(R), tm(G), tm(B)), z);
   }
 
-  // tone-mapping lembut: terang tidak langsung "jebol" jadi putih rata
+  // Tone-mapping lembut: terang tidak langsung "jebol" jadi putih rata
   float tm(float v) {
     if (v < 140) return max(v, 0);
     return 140 + 115 * (1 - exp(-(v - 140) / 115.0f));
@@ -286,12 +287,12 @@ class ElBackrooms {
     g.vertex(x, y, z);
   }
 
-  // titik bilinear di dalam quad P (12 angka), k = 0/1/2 (x/y/z)
+  // Titik bilinear di dalam quad P (12 angka), k = 0/1/2 (x/y/z)
   float bl(float[] P, float u, float w, int k) {
     return lerp(lerp(P[k], P[3 + k], u), lerp(P[9 + k], P[6 + k], u), w);
   }
 
-  // quad dengan pencahayaan per-vertex, dipecah nu x nv
+  // Quad dengan pencahayaan per-vertex, dipecah nu x nv
   void quadL(color c, float s, float nx, float ny, float nz, int nu, int nv,
              float x1, float y1, float z1, float x2, float y2, float z2,
              float x3, float y3, float z3, float x4, float y4, float z4) {
@@ -310,7 +311,7 @@ class ElBackrooms {
     g.endShape();
   }
 
-  // garis dengan warna per-vertex (disegmentasi supaya cahaya terlihat di sepanjang garis)
+  // Garis dengan warna per-vertex (disegmentasi supaya cahaya terlihat di sepanjang garis)
   void lineL(color c, float s, float wgt, float nx, float ny, float nz,
              float x1, float y1, float z1, float x2, float y2, float z2, int seg) {
     g.strokeWeight(wgt);
@@ -327,6 +328,7 @@ class ElBackrooms {
   }
 
   // ---------- pembantu geometri ----------
+  // Balok padat (partisi)
   void block(float x0, float x1, float z0, float z1) {
     float y0 = CEIL, y1 = FLOOR;
     int nx = max(1, (int) (abs(x1 - x0) / 100));
@@ -337,7 +339,7 @@ class ElBackrooms {
     quadL(wall, 0.60,  1, 0,  0, nz, 2, x1, y0, z0,  x1, y0, z1,  x1, y1, z1,  x1, y1, z0);
   }
 
-  // plint, wainscot, rel dinding, dan list atas
+  // Plint, wainscot, rel dinding, dan list atas
   void wallTrim(float x, float za, float zb, float nx) {
     float o = x + nx * 0.8;
     color dark = shade(wall, 0.68);
@@ -382,6 +384,7 @@ class ElBackrooms {
     return lerpColor(c, bg, f * f);
   }
 
+  // Hash integer deterministik -> 0..1 (untuk variasi per segmen)
   float hash(int k, int s) {
     int h = k * 374761393 + s * 668265263;
     h = (h ^ (h >>> 13)) * 1274126177;
@@ -389,7 +392,7 @@ class ElBackrooms {
     return (h & 0xFFFF) / 65536.0f;
   }
 
-  // gelapkan tepi layar
+  // Gelapkan tepi layar
   void vignette() {
     g.camera();
     g.perspective();
@@ -432,6 +435,7 @@ class ElBackrooms {
 //  4 ruangan Backrooms dengan kamera DIAM, sengaja gelap + vignette.
 //  Dirender ke kanvas terpisah (Canvas3D).
 //
+//  Pemakaian:
 //    backroomStatic = new ElBackroomStatic();          // di setup()
 //    backroomStatic.show(clock, ruang);                // di draw()
 //
@@ -442,16 +446,16 @@ class ElBackrooms {
 //
 //  Pengaturan opsional (field, ubah dari main/setup):
 //    backroomStatic.gelap = 0.7;   // kecerahan global, 0 = hitam ... 1 = terang
-//    backroomStatic.kedip = 0;     // >0 : lampu berdenyut halus tiap beat (mis. 0.3)
+//    backroomStatic.kedip = 0;     // >0 : lampu berdenyut halus tiap beat
 //    backroomStatic.debu  = 50;    // jumlah partikel debu (0 = mati)
 // =====================================================================
 class ElBackroomStatic {
-  Canvas3D cv = new Canvas3D();
-  PGraphics g;
+  Canvas3D cv = new Canvas3D();     // kanvas 3D terpisah
+  PGraphics g;                      // dipakai semua method gambar
 
-  float gelap = 0.7;
-  float kedip = 0;
-  int   debu  = 0;
+  float gelap = 0.7;                // kecerahan global (0 = hitam .. 1 = terang)
+  float kedip = 0;                  // >0 = lampu berdenyut tiap beat
+  int   debu  = 0;                  // jumlah partikel debu
 
   // arah cahaya kasar untuk shading sisi benda (datang dari sisi kamera)
   final float LX = 0.25;
@@ -459,19 +463,19 @@ class ElBackroomStatic {
 
   // dimensi ruangan aktif
   float fl, ce, wx, zb;      // lantai(y), plafon(y), setengah lebar(x), dinding belakang(z)
-  float amb = 0.1;           // cahaya ambient
-  float pulse = 1;
-  float tp = 0;              // posisi beat (untuk animasi debu)
+  float amb = 0.1;           // kekuatan cahaya ambient
+  float pulse = 1;           // pengali denyut lampu tiap beat
+  float tp = 0;              // salinan beatPos (untuk animasi debu)
   boolean backWall = true;   // ruangan punya dinding belakang polos?
-  int prismSub = 2;          // pecahan sisi balok
+  int prismSub = 2;          // jumlah pecahan sisi balok (untuk pencahayaan halus)
 
   // lampu titik (dengan warna)
-  int nL = 0;
+  int nL = 0;                                                   // jumlah lampu aktif
   float[] lampX = new float[8], lampY = new float[8], lampZ = new float[8];
-  float[] lampI = new float[8], lampRad = new float[8];
-  float[] lampR = new float[8], lampG = new float[8], lampB = new float[8];
+  float[] lampI = new float[8], lampRad = new float[8];         // intensitas & radius
+  float[] lampR = new float[8], lampG = new float[8], lampB = new float[8];  // warna (0..1)
 
-  // antrian glow lampu plafon (digambar paling akhir)
+  // antrian glow lampu plafon (digambar paling akhir dengan blend additive)
   int nG = 0;
   float[] gX = new float[10], gZ = new float[10], gRX = new float[10], gRZ = new float[10];
   float[] gR = new float[10], gG = new float[10], gB = new float[10];
@@ -492,9 +496,9 @@ class ElBackroomStatic {
 
     switch (ruang) {
       case 1:  roomLevel0();   break;
-      case 2:  roomLobi();   break;
-      case 3:  roomArch();   break;
-      case 4:  roomPlay();   break;
+      case 2:  roomLobi();     break;
+      case 3:  roomArch();     break;
+      case 4:  roomPlay();     break;
       default: roomLevel0DEFAULT();
     }
 
@@ -548,7 +552,7 @@ class ElBackroomStatic {
     prism(color(70),  170, fl, -1050, 122, 14, 122, 0);
   }
 
-  // ---- 0: Level 0 gelap (referensi gambar 1) ----
+  // ---- 0: Level 0 gelap ----
   void roomLevel0() {
     fl = 130; ce = -150; wx = 330; zb = -1500; amb = 0.09;
     addLamp(40, -130, -900, 2.0, 430, 1.0, 0.95, 0.70);
@@ -584,30 +588,25 @@ class ElBackroomStatic {
     prism(color(72, 69, 32),  170, fl, -1050, 122, 14, 122, 0);
   }
 
-  // detail bersama untuk Level 0 (kuning & abu-abu)
+  // Detail bersama untuk Level 0 (dipakai kuning & abu-abu)
   void level0Details(color trimC, color cseam, color fseam, color stainC) {
     trim(trimC);
-    // ubin plafon + ventilasi
-    gridH(cseam, ce + 0.6, -wx, wx, -110, zb, 120, 110, 2);
-    vent(-170, -380, 42, 22);
+    gridH(cseam, ce + 0.6, -wx, wx, -110, zb, 120, 110, 2);         // ubin plafon
+    vent(-170, -380, 42, 22);                                       // ventilasi
     vent(200, -1150, 42, 22);
-    // sambungan karpet
-    gridH(fseam, fl - 0.5, -wx, wx, -20, zb, 110, 110, 1);
-    // bingkai pintu
-    prism(trimC, -wx + 7, fl, -430, 14, fl - ce, 14, 0);
+    gridH(fseam, fl - 0.5, -wx, wx, -20, zb, 110, 110, 1);          // sambungan karpet
+    prism(trimC, -wx + 7, fl, -430, 14, fl - ce, 14, 0);            // bingkai pintu
     prism(trimC, -wx + 7, fl, -620, 14, fl - ce, 14, 0);
-    // noda lantai
-    stain(stainC, -90, -300, 38);
+    stain(stainC, -90, -300, 38);                                   // noda lantai
     stain(stainC, -70, -280, 26);
     stain(stainC, 120, -820, 62);
     stain(stainC, 150, -850, 34);
     stain(stainC, -150, -1200, 50);
-    // stopkontak di dinding belakang
-    prism(mul(trimC, 1.4), -200, fl - 35, zb + 3, 16, 26, 6, 0);
+    prism(mul(trimC, 1.4), -200, fl - 35, zb + 3, 16, 26, 6, 0);    // stopkontak
     prism(mul(trimC, 1.4),  220, fl - 35, zb + 3, 16, 26, 6, 0);
   }
 
-  // ---- 1: Lobi terbengkalai (referensi gambar 2) ----
+  // ---- 1: Lobi terbengkalai ----
   void roomLobi() {
     fl = 140; ce = -320; wx = 600; zb = -1000; amb = 0.13;
     addLamp(0, -300, -420, 1.1, 520, 1.0, 0.85, 0.60);
@@ -643,7 +642,7 @@ class ElBackroomStatic {
     sofa(mus,  300, -830, -0.45, 150, 100);
     sofa(color(176, 44, 62), 270, -340, -0.35, 190, 100);     // sofa merah kanan depan
 
-    // puing berserakan (lebih banyak)
+    // puing berserakan
     for (int i = 0; i < 40; i++) {
       float x = lerp(-380, 380, rnd(i, 1));
       float z = lerp(-300, -900, rnd(i, 2));
@@ -701,7 +700,7 @@ class ElBackroomStatic {
     stain(color(88, 78, 64), 200, -520, 70);
   }
 
-  // ---- 2: Lorong lengkung hijau (referensi gambar 3) ----
+  // ---- 2: Lorong lengkung hijau ----
   void roomArch() {
     fl = 130; ce = -270; wx = 450; zb = -2400; amb = 0.11;
     addLamp(300, -100, -300, 1.7, 520, 0.80, 1.0, 0.85);
@@ -740,13 +739,13 @@ class ElBackroomStatic {
     panel(0, -1500, 28, 130, color(190, 225, 195));
   }
 
-  // lampu dinding kecil
+  // Lampu dinding kecil
   void sconce(float x, float zF) {
     prism(color(40, 62, 46), x, -35, zF + 5, 26, 34, 10, 0);
     quadFlat(color(225, 255, 230), x - 8, -62, zF + 10.5, x + 8, -62, zF + 10.5, x + 8, -48, zF + 10.5, x - 8, -48, zF + 10.5);
   }
 
-  // ---- 3: Ruang bermain biru (referensi gambar 4) ----
+  // ---- 3: Ruang bermain biru ----
   void roomPlay() {
     fl = 170; ce = -230; wx = 520; zb = -420; amb = 0.20;
     addLamp(0, -200, -180, 1.5, 700, 1.0, 0.95, 0.90);
@@ -837,6 +836,8 @@ class ElBackroomStatic {
   // =====================================================================
   //  PEMBANTU: CAHAYA
   // =====================================================================
+  // Tambahkan satu lampu titik. `inten` = intensitas, `rad` = radius,
+  // r/gr/b = warna lampu (0..1).
   void addLamp(float x, float y, float z, float inten, float rad, float r, float gr, float b) {
     if (nL >= 8) return;
     lampX[nL] = x; lampY[nL] = y; lampZ[nL] = z;
@@ -845,7 +846,7 @@ class ElBackroomStatic {
     nL++;
   }
 
-  // warna akhir sebuah titik setelah kena cahaya + kabut gelap
+  // Warna akhir sebuah titik setelah kena cahaya + kabut gelap
   color lit(color c, float sh, float x, float y, float z) {
     float cr = amb, cg = amb, cb = amb;
     for (int i = 0; i < nL; i++) {
@@ -870,7 +871,7 @@ class ElBackroomStatic {
     return color(constrain(red(c) * f, 0, 255), constrain(green(c) * f, 0, 255), constrain(blue(c) * f, 0, 255));
   }
 
-  // simpan glow lampu plafon untuk digambar di akhir (additive)
+  // Simpan glow lampu plafon untuk digambar di akhir (additive)
   void addGlow(float cx, float cz, float rx, float rz, color c) {
     if (nG >= 10) return;
     gX[nG] = cx; gZ[nG] = cz; gRX[nG] = rx; gRZ[nG] = rz;
@@ -878,6 +879,7 @@ class ElBackroomStatic {
     nG++;
   }
 
+  // Gambar semua glow lampu sekaligus
   void glows() {
     g.hint(DISABLE_DEPTH_MASK);
     g.blendMode(ADD);
@@ -898,7 +900,7 @@ class ElBackroomStatic {
     g.hint(ENABLE_DEPTH_MASK);
   }
 
-  // debu halus melayang di udara
+  // Debu halus melayang di udara
   void dust(int n) {
     float len = -zb;
     g.strokeWeight(2);
@@ -916,12 +918,12 @@ class ElBackroomStatic {
   //  PEMBANTU: GEOMETRI
   // =====================================================================
 
-  // titik bilinear di dalam quad P (12 angka: 4 titik x,y,z), k = 0/1/2 (x/y/z)
+  // Titik bilinear di dalam quad P (12 angka: 4 titik x,y,z), k = 0/1/2 (x/y/z)
   float bl(float[] P, float u, float w, int k) {
     return lerp(lerp(P[k], P[3 + k], u), lerp(P[9 + k], P[6 + k], u), w);
   }
 
-  // quad yang dipecah nu x nv supaya cahaya per-vertex terlihat halus
+  // Quad yang dipecah nu x nv supaya cahaya per-vertex terlihat halus
   void quadN(color c, float sh, int nu, int nv,
              float x1, float y1, float z1, float x2, float y2, float z2,
              float x3, float y3, float z3, float x4, float y4, float z4) {
@@ -940,14 +942,14 @@ class ElBackroomStatic {
     g.endShape();
   }
 
-  // quad emisif (tidak kena pencahayaan), 1 warna
+  // Quad emisif (tidak kena pencahayaan), 1 warna
   void quadFlat(color c,
                 float x1, float y1, float z1, float x2, float y2, float z2,
                 float x3, float y3, float z3, float x4, float y4, float z4) {
     quadFlat4(c, c, c, c, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4);
   }
 
-  // quad emisif dengan warna berbeda tiap sudut (gradasi)
+  // Quad emisif dengan warna berbeda tiap sudut (gradasi)
   void quadFlat4(color c1, color c2, color c3, color c4,
                  float x1, float y1, float z1, float x2, float y2, float z2,
                  float x3, float y3, float z3, float x4, float y4, float z4) {
@@ -959,7 +961,7 @@ class ElBackroomStatic {
     g.endShape();
   }
 
-  // garis kena cahaya, dipecah seg bagian (warna per-vertex)
+  // Garis kena cahaya, dipecah `seg` bagian (warna per-vertex)
   void lineL(color c, float sh, float wgt,
              float x1, float y1, float z1, float x2, float y2, float z2, int seg) {
     g.strokeWeight(wgt);
@@ -975,12 +977,12 @@ class ElBackroomStatic {
     g.noStroke();
   }
 
-  // cangkang ruangan: lantai, plafon, dinding kiri/kanan/belakang
+  // Cangkang ruangan: lantai, plafon, dinding kiri/kanan/belakang
   void shell(color floorC, color ceilC, color wallC, color backC) {
     shell(floorC, ceilC, wallC, backC, true);
   }
 
-  // back = false -> dinding belakang tidak digambar (dipakai ruang 3 yang punya alcove)
+  // `back` = false -> dinding belakang tidak digambar (dipakai ruang 3 yang punya alcove)
   void shell(color floorC, color ceilC, color wallC, color backC, boolean back) {
     backWall = back;
     quadN(floorC, 1.0, 12, 12, -wx, fl, 0,  wx, fl, 0,  wx, fl, zb, -wx, fl, zb);
@@ -991,7 +993,7 @@ class ElBackroomStatic {
     contactShadows();
   }
 
-  // bayangan gelap lembut di pertemuan lantai/plafon dengan dinding
+  // Bayangan gelap lembut di pertemuan lantai/plafon dengan dinding
   void contactShadows() {
     float s = 70;
     float yf = fl - 0.6, yc = ce + 0.6;
@@ -1039,7 +1041,7 @@ class ElBackroomStatic {
     g.endShape();
   }
 
-  // panel lampu plafon (emisif) + bingkai + pembagi + glow
+  // Panel lampu plafon (emisif) + bingkai + pembagi + glow
   void panel(float cx, float cz, float hw, float hd, color c) {
     float fw = 6;
     quadN(color(70, 70, 64), 1, 2, 2,
@@ -1055,7 +1057,7 @@ class ElBackroomStatic {
     addGlow(cx, cz, hw * 4.0, hd * 4.0, c);
   }
 
-  // lampu plafon bulat
+  // Lampu plafon bulat
   void recessed(float cx, float cz, float r) {
     ring(color(60, 100, 112), 1, cx, ce + 1.0, cz, r, r + 7, 20, 1);
     g.beginShape(TRIANGLE_FAN);
@@ -1069,7 +1071,7 @@ class ElBackroomStatic {
     addGlow(cx, cz, r * 4.0, r * 4.0, color(255, 245, 230));
   }
 
-  // ventilasi plafon
+  // Ventilasi plafon
   void vent(float cx, float cz, float w, float d) {
     float y = ce + 1.2;
     quadFlat(color(6), cx - w, y, cz - d, cx + w, y, cz - d, cx + w, y, cz + d, cx - w, y, cz + d);
@@ -1079,12 +1081,13 @@ class ElBackroomStatic {
     g.noStroke();
   }
 
-  // noda gelap di lantai
+  // Noda gelap di lantai
   void stain(color c, float cx, float cz, float r) {
     disc(c, 1, cx, fl - 1.2, cz, r, 14, 1);
   }
 
-  // grid garis horizontal: y tetap, x dari x0..x1 (garis sepanjang z), z dari zA ke zB (garis sepanjang x)
+  // Grid garis horizontal: y tetap, x dari x0..x1 (garis sepanjang z),
+  // z dari zA ke zB (garis sepanjang x). sx/sz = jarak antar garis.
   void gridH(color c, float y, float x0, float x1, float zA, float zB, float sx, float sz, float wgt) {
     for (float x = x0 + sx; x < x1 - 1; x += sx)
       lineL(c, 1, wgt, x, y, 0, x, y, zB, max(1, (int) (abs(zB) / 300)));
@@ -1092,7 +1095,7 @@ class ElBackroomStatic {
       lineL(c, 1, wgt, x0, y, z, x1, y, z, max(1, (int) ((x1 - x0) / 300)));
   }
 
-  // plint + list plafon (crown)
+  // Plint + list plafon (crown)
   void trim(color c) {
     prismSub = 6;
     prism(c, -wx + 4, fl, zb / 2, 8, 16, -zb, 0);
@@ -1107,7 +1110,7 @@ class ElBackroomStatic {
     prismSub = 2;
   }
 
-  // wainscot (panel bawah dinding) + rel
+  // Wainscot (panel bawah dinding) + rel
   void wainscot(color c, float h) {
     float yt = fl - h;
     quadN(c, 0.8, 6, 2, -wx + 0.8, yt, 0, -wx + 0.8, yt, zb, -wx + 0.8, fl, zb, -wx + 0.8, fl, 0);
@@ -1121,19 +1124,19 @@ class ElBackroomStatic {
     }
   }
 
-  // garis vertikal motif wallpaper di dinding samping (x tetap, sepanjang z)
+  // Garis vertikal motif wallpaper di dinding samping (x tetap, sepanjang z)
   void stripesZ(float x, float za, float zb2, color c, float step) {
     for (float z = za - 10; z > zb2; z -= step)
       lineL(c, 0.8, 2, x, ce, z, x, fl, z, 1);
   }
 
-  // garis vertikal motif wallpaper di dinding belakang (z tetap, sepanjang x)
+  // Garis vertikal motif wallpaper di dinding belakang (z tetap, sepanjang x)
   void stripesX(float z, float xa, float xb, color c, float step) {
     for (float x = xa + 10; x < xb; x += step)
       lineL(c, 0.8, 2, x, ce, z, x, fl, z, 1);
   }
 
-  // balok (boleh diputar yaw). yb = y alas, h = tinggi
+  // Balok (boleh diputar yaw). `yb` = y alas, `h` = tinggi.
   void prism(color c, float cx, float yb, float cz, float w, float h, float d, float yaw) {
     float[] px = new float[4], pz = new float[4];
     float[] ox = { -w / 2, w / 2, w / 2, -w / 2 };
@@ -1150,14 +1153,14 @@ class ElBackroomStatic {
       float len = sqrt(ex * ex + ez * ez);
       float nx = ez / len, nz = -ex / len;
       float mx = (px[i] + px[j]) / 2 - cx, mz = (pz[i] + pz[j]) / 2 - cz;
-      if (nx * mx + nz * mz < 0) { nx = -nx; nz = -nz; }
+      if (nx * mx + nz * mz < 0) { nx = -nx; nz = -nz; }   // pastikan normal menghadap luar
       float sh = 0.5 + 0.5 * max(0, nx * LX + nz * LZ);
       quadN(c, sh, prismSub, 2, px[i], yb, pz[i], px[j], yb, pz[j], px[j], yt, pz[j], px[i], yt, pz[i]);
     }
     quadN(c, 1.0, prismSub, prismSub, px[0], yt, pz[0], px[1], yt, pz[1], px[2], yt, pz[2], px[3], yt, pz[3]);
   }
 
-  // bola mainan sederhana (dengan highlight)
+  // Bola mainan sederhana (dengan highlight)
   void ball(color c, float cx, float cz, float r) {
     g.pushMatrix();
     g.translate(cx, fl - r, cz);
@@ -1170,7 +1173,7 @@ class ElBackroomStatic {
     g.popMatrix();
   }
 
-  // silinder (kolom) tanpa tutup
+  // Silinder (kolom) tanpa tutup
   void cyl(color c, float cx, float cz, float r, float yb, float h, int seg) {
     float yt = yb - h;
     for (int i = 0; i < seg; i++) {
@@ -1184,7 +1187,7 @@ class ElBackroomStatic {
     }
   }
 
-  // cincin. plane 0 = tegak (bidang XY), plane 1 = rata (bidang XZ / lantai)
+  // Cincin. `plane` 0 = tegak (bidang XY), 1 = rata (bidang XZ / lantai)
   void ring(color c, float sh, float cx, float cy, float cz, float r0, float r1, int seg, int plane) {
     g.beginShape(QUADS);
     for (int i = 0; i < seg; i++) {
@@ -1202,12 +1205,12 @@ class ElBackroomStatic {
     else            v(c, sh, cx + r * cos(a), cy, cz + r * sin(a));
   }
 
-  // piringan penuh (dipecah 3 cincin supaya cahaya halus)
+  // Piringan penuh (dipecah 3 cincin supaya cahaya halus)
   void disc(color c, float sh, float cx, float cy, float cz, float r, int seg, int plane) {
     for (int k = 0; k < 3; k++) ring(c, sh, cx, cy, cz, r * k / 3.0f, r * (k + 1) / 3.0f, seg, plane);
   }
 
-  // jendela bulat berbingkai warna
+  // Jendela bulat berbingkai warna
   void windowRing(float cx, float cy, float z, float ro, float ri, color c) {
     ring(c, 1, cx, cy, z + 1, ri, ro, 24, 0);
     disc(color(36, 70, 90), 1, cx, cy, z, ri, 24, 0);
@@ -1215,7 +1218,7 @@ class ElBackroomStatic {
     disc(color(60, 140, 200), 1, cx + ri * 0.25, cy - ri * 0.2, z + 0.5, ri * 0.28, 10, 0);
   }
 
-  // dinding berlubang lengkung (arch). zF = muka depan, th = tebal
+  // Dinding berlubang lengkung (arch). zF = muka depan, th = tebal
   void archWall(color c, color rev, float zF, float th, float xL, float xR, float yT, float yB,
                 float cx, float a, float ys, int seg) {
     quadN(c, 1.0, 3, 3, xL, yT, zF, cx - a, yT, zF, cx - a, yB, zF, xL, yB, zF);
@@ -1250,7 +1253,7 @@ class ElBackroomStatic {
     g.endShape();
   }
 
-  // list timbul di sekeliling lengkung (setengah cincin + dua tiang)
+  // List timbul di sekeliling lengkung (setengah cincin + dua tiang)
   void archTrim(color c, float zF, float cx, float a, float ys, float w, int seg) {
     float zr = zF + 1.5;
     g.beginShape(QUADS);
@@ -1266,13 +1269,13 @@ class ElBackroomStatic {
     quadN(c, 1, 2, 3, cx + a, ys, zr, cx + a + w, ys, zr, cx + a + w, fl, zr, cx + a, fl, zr);
   }
 
-  // sofa / kursi menghadap +z lokal, diputar yaw
+  // Sofa / kursi menghadap +z lokal, diputar yaw
   void sofa(color c, float cx, float cz, float yaw, float len, float dep) {
     part(c, cx, cz, yaw, 0, 0, len, 40, dep);                              // dudukan
     part(c, cx, cz, yaw, 0, -(dep / 2 - 14), len, 100, 28);                // sandaran
     part(c, cx, cz, yaw, -(len / 2 - 14), 0, 28, 68, dep);                 // lengan kiri
     part(c, cx, cz, yaw,  (len / 2 - 14), 0, 28, 68, dep);                 // lengan kanan
-    part(mul(c, 0.55), cx, cz, yaw, 0, 0, len - 6, 10, dep - 6);           // kolong gelap di bawah
+    part(mul(c, 0.55), cx, cz, yaw, 0, 0, len - 6, 10, dep - 6);           // kolong gelap
   }
 
   void part(color c, float cx, float cz, float yaw, float ox, float oz, float w, float h, float d) {
@@ -1280,7 +1283,7 @@ class ElBackroomStatic {
     prism(c, cx + ox * cs - oz * sn, fl, cz + ox * sn + oz * cs, w, h, d, yaw);
   }
 
-  // angka acak stabil 0..1
+  // Angka acak stabil 0..1
   float rnd(int i, int s) {
     int h = i * 374761393 + s * 668265263;
     h = (h ^ (h >>> 13)) * 1274126177;
@@ -1288,7 +1291,7 @@ class ElBackroomStatic {
     return (h & 0xFFFF) / 65536.0f;
   }
 
-  // gelapkan tepi layar
+  // Gelapkan tepi layar
   void vignette() {
     g.camera();
     g.perspective();

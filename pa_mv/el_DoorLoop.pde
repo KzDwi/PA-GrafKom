@@ -1,21 +1,24 @@
 // =====================================================================
 //  el_DoorLoop.pde   [ELEMENT 3D - LATAR]
-//  Cuplikan pintu: kamera maju pelan ke pintu, pintu terbuka SATU KALI, lalu
-//  kamera DIAM sebentar (ruangan di baliknya ternyata sama persis dengan ruangan awal).
+//  Cuplikan pintu: kamera maju pelan ke pintu, pintu terbuka SATU KALI,
+//  lalu kamera DIAM sebentar (ruangan di baliknya ternyata sama persis).
 //  Setelah itu ditutup transisi mozaik (FxMosaic) dari main.
 //  Semua dihitung dari clock.beatPos -> aman pause/restart.
 //
-//  doorLoop = new ElDoorLoop();                 // setup()
-//  doorLoop.show(clock, 100);                   // draw()  (100 = beat mulai cuplikan)
+//  Pemakaian:
+//    doorLoop = new ElDoorLoop();                 // setup()
+//    doorLoop.show(clock, 100);                   // draw()  (100 = beat mulai cuplikan)
 //
-//  Atur waktu: OPEN_START/OPEN_LEN (pintu), MOVE_LEN (kamera maju), MOVE_DIST (jarak maju).
+//  Waktu animasi: OPEN_START/OPEN_LEN (pintu), MOVE_LEN (kamera maju),
+//  MOVE_DIST (jarak maju dalam pecahan jarak antar dinding).
 // =====================================================================
 class ElDoorLoop {
   final float OPEN_START = 0.30;  // pintu mulai terbuka (beat sejak mulai)
   final float OPEN_LEN   = 1.00;  // lama pintu membuka
   final float MOVE_LEN   = 1.70;  // lama kamera maju, sesudah itu DIAM
   final float MOVE_DIST  = 0.42;  // jarak maju (x jarak antar dinding)
-  float openAmt = 0;
+  float openAmt = 0;              // sudut bukaan pintu (0..1)
+
   final float L      = 420;       // jarak antar dinding pintu
   final float HALF   = 230;       // setengah lebar lorong
   final float FLOOR  = 115;       // y lantai
@@ -24,22 +27,22 @@ class ElDoorLoop {
   final float DOOR_T = -92;       // y atas pintu
   final int   ROOMS  = 5;         // berapa ruangan digambar ke depan
 
-  Canvas3D cv = new Canvas3D();
-  PGraphics g;
-  color bgC = color(14, 12, 5);
-  float camZ;
+  Canvas3D cv = new Canvas3D();   // kanvas 3D terpisah
+  PGraphics g;                    // dipakai semua method gambar
+  color bgC = color(14, 12, 5);   // warna latar & kabut
+  float camZ;                     // posisi Z kamera saat ini
 
   void show(BeatClock t, float startBeat) {
-    float local = max(0, t.beatPos - startBeat);
+    float local = max(0, t.beatPos - startBeat);   // beat sejak mulai
     float mv = constrain(local / MOVE_LEN, 0, 1);
     mv = 1 - pow(1 - mv, 3);                                  // maju melambat lalu berhenti
     camZ = -mv * MOVE_DIST * L;
     float ov = constrain((local - OPEN_START) / OPEN_LEN, 0, 1);
     openAmt = ov * ov * (3 - 2 * ov);                         // buka sekali, lalu tetap terbuka
-    float hold = constrain((local - MOVE_LEN) / 0.3, 0, 1);                  // fase diam: goyangan dikecilkan
+    float hold = constrain((local - MOVE_LEN) / 0.3, 0, 1);                  // fase diam
     float punch = pow(1 - t.frac, 4) * (1 - 0.7 * hold);
-    float sx = sin(t.beatPos * PI * 0.5) * 5 * (1 - 0.8 * hold);
-    float sy = -abs(sin(t.beatPos * PI)) * 3 * (1 - 0.8 * hold);
+    float sx = sin(t.beatPos * PI * 0.5) * 5 * (1 - 0.8 * hold);              // goyang X
+    float sy = -abs(sin(t.beatPos * PI)) * 3 * (1 - 0.8 * hold);              // goyang Y
     float fov = radians(68) - punch * 0.04 - constrain(local / 3.0, 0, 1) * 0.06;
 
     g = cv.begin();
@@ -102,7 +105,7 @@ class ElDoorLoop {
     g.pushMatrix();
     g.translate(-DOOR_W, 0, zk - 1);
     g.rotateY(open * radians(105));
-    float shd = constrain(0.55 + 0.45 * (1 - open), 0, 1);
+    float shd = constrain(0.55 + 0.45 * (1 - open), 0, 1);   // makin terbuka makin gelap
     color leaf = fogC(color(95 * shd, 62 * shd, 24 * shd), zk);
     g.fill(leaf);
     g.beginShape(QUADS);
@@ -121,30 +124,36 @@ class ElDoorLoop {
   }
 
   // ---------- helper gambar ----------
-  // bidang dari (xa,ya) ke (xb,yb) memanjang dari za ke zb, dipotong n irisan agar kabutnya halus
+
+  // Bidang dari (xa,ya) ke (xb,yb) memanjang dari za ke zb,
+  // dipotong `n` irisan agar kabut terlihat halus
   void slices(color c, float xa, float ya, float xb, float yb, float za, float zb, int n) {
     for (int s = 0; s < n; s++) {
       float a = lerp(za, zb, s / (float) n), b = lerp(za, zb, (s + 1) / (float) n);
       zq(fogC(c, (a + b) / 2), xa, ya, xb, yb, a, b);
     }
   }
+
   void zqs(color c, float xa, float ya, float xb, float yb, float za, float zb) {
     slices(c, xa, ya, xb, yb, za, zb, 3);
   }
+
   void zq(color c, float xa, float ya, float xb, float yb, float za, float zb) {
     g.fill(c);
     g.beginShape(QUADS);
     g.vertex(xa, ya, za); g.vertex(xb, yb, za); g.vertex(xb, yb, zb); g.vertex(xa, ya, zb);
     g.endShape();
   }
-  // bidang tegak lurus sumbu z (dinding melintang)
+
+  // Bidang tegak lurus sumbu z (dinding melintang)
   void xq(color c, float xa, float ya, float xb, float yb, float z) {
     g.fill(c);
     g.beginShape(QUADS);
     g.vertex(xa, ya, z); g.vertex(xb, ya, z); g.vertex(xb, yb, z); g.vertex(xa, yb, z);
     g.endShape();
   }
-  // kabut gelap: makin jauh dari kamera makin gelap
+
+  // Kabut gelap: makin jauh dari kamera makin gelap
   color fogC(color c, float z) {
     float d = constrain((camZ - z) / (L * 3.6), 0, 1);
     return lerpColor(c, bgC, pow(d, 0.8));

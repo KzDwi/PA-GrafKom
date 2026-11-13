@@ -1,51 +1,56 @@
 // =====================================================================
-//  el_RuangTV.pde   [ELEMENT 2D - ADEGAN BINGKAI -> TV]   beat 329 -> ...
-//  Memakai ruangan dari ElRuangBeat (ganti ruangan tiap beat, urutan di bawah),
-//  tetapi gambarnya diambil lewat kanvas offscreen lalu di-BLUR.
+//  el_RuangTV.pde   [ELEMENT 2D - ADEGAN BINGKAI -> TV]
+//  Menggunakan ruangan dari ElRuangBeat (indeks ruangan berganti tiap beat
+//  mengikuti array `urut`), lalu gambarnya diambil lewat kanvas offscreen
+//  dan di-BLUR.
 //
-//  ruangTV = new ElRuangTV(ruangBeat);            // setup()   (setelah ruangBeat dibuat)
-//  ruangTV.show(clock);                           // draw(), beat >= 329 (2D, digambar penuh layar)
-//  Pengaturan: konstanta di atas class (beat mulai/akhir, ukuran layar TV, kekuatan blur/redup).
+//  Pemakaian:
+//    ruangTV = new ElRuangTV(ruangBeat);   // di setup(), setelah ruangBeat dibuat
+//    ruangTV.show(clock);                  // di draw(), saat beat >= 329
 // =====================================================================
 class ElRuangTV {
-  // ---- jadwal (beat) ----
-  float A_MULAI = 329;       // bingkai mulai
-  float A_AKHIR = 343;       // zoom out selesai (gambar = layar TV)
-  float E_AKHIR = 344.5;     // error hitam-putih selesai, TV menyala
-  float OFF_MULAI = 356;     // TV mati (layar menutup dari pinggir ke tengah + bintang putih)
-  float OFF_DUR = 0.8;       // lama animasi menutup (beat); gelap penuh di OFF_MULAI + 1.2 x OFF_DUR
+  // ---- jadwal (satuan beat) ----
+  float A_MULAI = 329;       // beat saat bingkai mulai muncul
+  float A_AKHIR = 343;       // beat saat zoom-out selesai (gambar = ukuran layar TV)
+  float E_AKHIR = 344.5;     // beat saat error hitam-putih selesai, TV menyala
+  float OFF_MULAI = 356;     // beat saat TV mulai mati (layar menutup dari tepi ke tengah)
+  float OFF_DUR = 0.8;       // durasi animasi menutup (beat); gelap penuh di OFF_MULAI + 1.2*OFF_DUR
 
-  // ---- layar TV akhir (px, untuk window 1280x720) ----
-  float scrW = 587, scrH = 440, scrCX = 640, scrCY = 322;
+  // ---- ukuran layar TV akhir (px, untuk window 1280x720) ----
+  float scrW = 587, scrH = 440;   // lebar & tinggi kaca layar TV
+  float scrCX, scrCY;              // titik tengah layar TV di layar
 
   // ---- tampilan ----
   float dimTV = 0.55;        // kecerahan gambar di dalam TV (1 = normal)
-  float blurA = 1.0;         // blur adegan bingkai (radius, kanvas 1/2 ukuran)
-  float blurB = 1.5;         // blur di dalam TV (radius, kanvas ~1/5 ukuran)
+  float blurA = 1.0;         // radius blur adegan bingkai (kanvas 1/2 ukuran)
+  float blurB = 1.5;         // radius blur di dalam TV (kanvas ~1/5 ukuran)
 
-  ElRuangBeat ruang;
-  PGraphics bufA, bufB;      // kanvas blur sedang & kuat
-  PImage vigImg;             // gradasi gelap di tepi gambar
-  color avg = color(120, 100, 50);
-  int[] urut = { 6, 10, 3, 13, 1, 8, 14, 5, 11, 0, 9, 2, 15, 7, 12, 4 };
+  ElRuangBeat ruang;         // sumber ruangan yang dipakai sebagai isi layar
+  PGraphics bufA, bufB;      // kanvas offscreen: blur sedang (bufA) & blur kuat (bufB)
+  PImage vigImg;             // tekstur gradasi gelap di tepi gambar (vignette)
+  color avg = color(120, 100, 50);   // warna rata-rata ruangan, dipakai untuk cahaya TV
+  int[] urut = { 6, 10, 3, 13, 1, 8, 14, 5, 11, 0, 9, 2, 15, 7, 12, 4 };  // urutan indeks ruangan yang diputar tiap beat
 
   ElRuangTV(ElRuangBeat r) { ruang = r; }
 
   // ------------------------------------------------------------------
   void show(BeatClock t) {
+    scrCX = width / 2.0;
+    scrCY = height / 2.0 - 7;   // geser -7 px agar bodi + panel bawah seimbang
     float b = t.beatPos;
     if (b < A_MULAI) return;
-    if (b >= OFF_MULAI + OFF_DUR * 1.2) return;     // sudah hitam penuh: tidak menggambar apa-apa
+    if (b >= OFF_MULAI + OFF_DUR * 1.2) return;   // sudah hitam penuh: tidak menggambar apa-apa
     siap();
     hint(DISABLE_DEPTH_TEST);
     noLights();
     rectMode(CORNER);
     imageMode(CORNER);
-    if (b < A_AKHIR) showBingkai(t);
-    else             showTV(t);
+    if (b < A_AKHIR) showBingkai(t);   // fase zoom-out bingkai
+    else             showTV(t);        // fase error / TV menyala / TV mati
     hint(ENABLE_DEPTH_TEST);
   }
 
+  // buat kanvas & tekstur vignette sekali saja (lazy init)
   void siap() {
     if (bufA == null) {
       bufA = createGraphics(640, 360, P2D);
@@ -61,7 +66,8 @@ class ElRuangTV {
     }
   }
 
-  // render ruangan beat ini ke kanvas kecil lalu blur
+  // Render ruangan beat saat ini ke kanvas kecil, lalu blur.
+  // `kuat` = true -> pakai bufB (blur lebih kuat); false -> bufA.
   PGraphics ambil(BeatClock t, boolean kuat) {
     int idx = urut[((t.beat - (int) A_MULAI) % urut.length + urut.length) % urut.length];
     ruang.tempel = false;
@@ -73,7 +79,7 @@ class ElRuangTV {
     dst.image(ruang.cv.pg, 0, 0, dst.width, dst.height);
     dst.filter(BLUR, kuat ? blurB : blurA);
     dst.endDraw();
-    // warna rata-rata (untuk cahaya TV)
+    // hitung warna rata-rata dari 9 titik sampel (untuk cahaya TV)
     dst.loadPixels();
     float r = 0, g2 = 0, bl = 0;
     for (int j = 1; j < 4; j++) for (int i = 1; i < 4; i++) {
@@ -85,13 +91,13 @@ class ElRuangTV {
   }
 
   // =====================================================================
-  //  A. BINGKAI ZOOM OUT
+  //  A. BINGKAI ZOOM OUT (beat A_MULAI .. A_AKHIR)
   // =====================================================================
   void showBingkai(BeatClock t) {
     float p = constrain((t.beatPos - A_MULAI) / (A_AKHIR - A_MULAI), 0, 1);
-    float e = p * p * (3 - 2 * p);
-    float s = lerp(1.0, scrH / 720.0, e);
-    float cx = width / 2.0, cy = lerp(height / 2.0, scrCY, e);
+    float e = p * p * (3 - 2 * p);                       // smoothstep dari 0..1
+    float s = lerp(1.0, scrH / 720.0, e);                // skala gambar (menyusut)
+    float cx = width / 2.0, cy = lerp(height / 2.0, scrCY, e);  // titik tengah gambar
     float w = 960 * s * (width / 1280.0), h = 720 * s * (height / 720.0);
 
     noStroke();
@@ -99,13 +105,14 @@ class ElRuangTV {
     rect(0, 0, width, height);
 
     PGraphics im = ambil(t, false);
-    float punch = pow(1 - t.frac, 3);
+    float punch = pow(1 - t.frac, 3);                   // punch = kilatan tiap beat (memudar dalam 1 beat)
     edgeGlow(cx, cy, w, h, avg, 1.0 + 0.3 * punch);
     gambar(im, cx, cy, w, h, 1.0, 46 * s, punch);
     scanlinesGlobal();
   }
 
-  // gambar blur + bloom + RGB split + scanline + vignette, lalu topeng sudut membulat
+  // Gambar blur + bloom + RGB split + scanline + vignette, lalu topeng sudut membulat.
+  // `dim` = kecerahan, `rad` = radius sudut, `punch` = kilatan per beat.
   void gambar(PImage im, float cx, float cy, float w, float h, float dim, float rad, float punch) {
     float x0 = cx - w / 2, y0 = cy - h / 2;
     noStroke();
@@ -114,9 +121,9 @@ class ElRuangTV {
     blendMode(ADD);
     tint(255, 255 * dim * 0.18);                       // bloom lembut
     image(im, x0 - w * 0.025, y0 - h * 0.025, w * 1.05, h * 1.05);
-    tint(255, 40, 40, 38 * dim);                      // RGB split
+    tint(255, 40, 40, 38 * dim);                       // RGB split kanan
     image(im, x0 + 3, y0, w, h);
-    tint(40, 255, 255, 30 * dim);
+    tint(40, 255, 255, 30 * dim);                      // RGB split kiri
     image(im, x0 - 3, y0, w, h);
     blendMode(BLEND);
     noTint();
@@ -130,7 +137,7 @@ class ElRuangTV {
     maskBulat(cx, cy, w, h, rad, color(5, 4, 3));
   }
 
-  // cahaya lembut di luar tepi gambar
+  // Cahaya lembut di luar tepi gambar.
   void edgeGlow(float cx, float cy, float w, float h, color c, float k) {
     blendMode(ADD);
     noFill();
@@ -144,7 +151,7 @@ class ElRuangTV {
     noStroke();
   }
 
-  // garis halus tipis di seluruh layar (kesan monitor CRT)
+  // Garis scanline tipis di seluruh layar (kesan monitor CRT).
   void scanlinesGlobal() {
     stroke(255, 7);
     strokeWeight(1);
@@ -152,7 +159,8 @@ class ElRuangTV {
     noStroke();
   }
 
-  // topeng sudut: hanya 4 sudut gambar yang digelapkan, jadi tepi gambar tampak membulat
+  // Topeng sudut: hanya 4 sudut gambar yang digelapkan, sehingga tepi gambar
+  // tampak membulat. `r` = radius, `c` = warna topeng.
   void maskBulat(float cx, float cy, float w, float h, float r, color c) {
     float x0 = cx - w / 2, y0 = cy - h / 2, x1 = cx + w / 2, y1 = cy + h / 2;
     r = min(r, min(w, h) / 2.5);
@@ -161,7 +169,7 @@ class ElRuangTV {
     beginShape();
     vertex(x0 - 1, y0 - 1); vertex(x1 + 1, y0 - 1); vertex(x1 + 1, y1 + 1); vertex(x0 - 1, y1 + 1);
     beginContour();
-    int n = 7;
+    int n = 7;                                          // jumlah segmen tiap lengkung sudut
     float[][] cc = { { x0 + r, y0 + r, -90 }, { x0 + r, y1 - r, 180 }, { x1 - r, y1 - r, 90 }, { x1 - r, y0 + r, 0 } };
     for (int k = 0; k < 4; k++) {
       for (int i = 0; i <= n; i++) {
@@ -174,20 +182,20 @@ class ElRuangTV {
   }
 
   // =====================================================================
-  //  B. ERROR HITAM-PUTIH -> TV
+  //  B. ERROR HITAM-PUTIH -> TV MENYALA (beat A_AKHIR .. OFF_MULAI)
   // =====================================================================
   void showTV(BeatClock t) {
     float b = t.beatPos;
     if (b >= OFF_MULAI) { showMati(t, (b - OFF_MULAI) / OFF_DUR); return; }
-    float u = constrain((b - A_AKHIR) / (E_AKHIR - A_AKHIR), 0, 1);   // 0..1 selama error
+    float u = constrain((b - A_AKHIR) / (E_AKHIR - A_AKHIR), 0, 1);   // 0..1 selama fase error
     float punch = pow(1 - t.frac, 3);
 
-    // fase: gambar bingkai terakhir -> (static penuh layar) -> TV + isi layar menyala
+    // Fase: bingkai terakhir -> static penuh layar -> TV + isi layar menyala.
     boolean kuat = u > 0.4;
-    float tvA   = sst(0.35, 0.8, u);          // TV + cahaya sekitar muncul
-    float isiA  = sst(0.55, 1.0, u);          // isi layar (ruangan) muncul dari static
-    float full  = sst(0.12, 0.28, u) * (1 - sst(0.5, 0.64, u));   // static hitam-putih SELURUH layar
-    float scr   = sst(0.0, 0.2, u) * (1 - sst(0.78, 1.0, u));     // static di dalam layar TV
+    float tvA   = sst(0.35, 0.8, u);                                 // TV + cahaya sekitar muncul
+    float isiA  = sst(0.55, 1.0, u);                                 // isi layar (ruangan) muncul dari static
+    float full  = sst(0.12, 0.28, u) * (1 - sst(0.5, 0.64, u));      // static hitam-putih SELURUH layar
+    float scr   = sst(0.0, 0.2, u) * (1 - sst(0.78, 1.0, u));        // static di dalam layar TV
 
     noStroke();
     fill(5, 4, 3);
@@ -214,25 +222,24 @@ class ElRuangTV {
       staticBW(t, x0 - 80, y0 - 20, scrW + 160, scrH + 40, 14 + 10 * (int) (4 * hs(floor(b * 20))), scr);
       noClip();
     }
-    // flash menyala (CRT)
+    // kilatan putih CRT saat TV baru menyala
     if (u > 0.72 && u < 1.0) {
       fill(255, 120 * (1 - (u - 0.72) / 0.28));
       rect(x0, y0, scrW, scrH);
     }
 
-    // static layar penuh (paling error)
+    // static layar penuh (paling parah di fase error)
     if (full > 0.01) {
       staticBW(t, -40, -40, width + 80, height + 80, 20 + 20 * (int) (3 * hs(floor(b * 17) + 3)), full);
-      // pita putih sobekan
+      // pita putih sobekan horizontal
       fill(255, 220 * full);
       for (int i = 0; i < 4; i++) rect(0, hs(floor(b * 23) * 7 + i) * height, width, 3 + 18 * hs(i + floor(b * 23)));
     }
     scanlinesGlobal();
   }
 
-
   // =====================================================================
-  //  C. TV MATI  (q = 0..1.2 ; 1.0 = layar sudah menutup)
+  //  C. TV MATI  (q = 0..1.2 ; 1.0 = layar sudah menutup penuh)
   // =====================================================================
   void showMati(BeatClock t, float q) {
     float punch = pow(1 - t.frac, 3);
@@ -286,7 +293,7 @@ class ElRuangTV {
       blendMode(BLEND);
     }
 
-    // bintang putih
+    // bintang putih (kilatan terakhir)
     float sa = sst(0.62, 0.84, q) * fadeOut;
     if (sa > 0.01) {
       float s = lerp(0.35, 1.0, sst(0.62, 0.95, q));
@@ -310,7 +317,8 @@ class ElRuangTV {
     scanlinesGlobal();
   }
 
-  // garis kilau horizontal: terang di tengah, memudar ke kedua ujung
+  // Garis kilau horizontal: terang di tengah, memudar ke kedua ujung.
+  // `dy` = offset vertikal dari cy, `th` = setengah ketebalan, `panjang` = panjang total.
   void streak(float cx, float cy, float dy, float th, float alpha, float panjang) {
     float xa = cx - panjang / 2, xb = cx + panjang / 2;
     beginShape(QUADS);
@@ -323,10 +331,10 @@ class ElRuangTV {
     endShape();
   }
 
-  // isi layar TV: gambar blur yang diredupkan (alpha a), sudut layar membulat gelap
+  // Isi layar TV: gambar blur yang diredupkan (alpha `a`), sudut layar membulat gelap.
   void gambar2(PImage im, float cx, float cy, float w, float h, float dim, float a, float punch) {
     float x0 = cx - w / 2, y0 = cy - h / 2;
-    float flick = 0.94 + 0.06 * noise(frameCount * 0.07);
+    float flick = 0.94 + 0.06 * noise(frameCount * 0.07);   // kedip halus khas CRT
     noStroke();
     tint(255 * dim * flick, 255 * a);
     image(im, x0, y0, w, h);
@@ -356,7 +364,8 @@ class ElRuangTV {
   }
 
   // ------------------------------------------------------------------
-  //  TV (bodi, bezel, panel kontrol) + cahaya sekitar warna rata-rata ruangan
+  //  Bodi TV (plastik, bezel, panel kontrol) + cahaya sekitar
+  //  berwarna rata-rata ruangan. `al` = alpha tampil, `glowK` = kekuatan cahaya.
   // ------------------------------------------------------------------
   void drawTV(BeatClock t, float al, float glowK) {
     float x0 = scrCX - scrW / 2, y0 = scrCY - scrH / 2, x1 = scrCX + scrW / 2, y1 = scrCY + scrH / 2;
@@ -408,10 +417,12 @@ class ElRuangTV {
   }
 
   // ------------------------------------------------------------------
-  //  Static hitam-putih kotak-kotak (1 beginShape; kotak acak, sebagian baris tergeser)
+  //  Static hitam-putih kotak-kotak (dalam 1 beginShape).
+  //  `bs` = ukuran blok, `dens` = kerapatan (0..1) blok yang tampil.
+  //  Sebagian baris tergeser acak untuk kesan tracking error.
   // ------------------------------------------------------------------
   void staticBW(BeatClock t, float x, float y, float w, float h, int bs, float dens) {
-    int st = floor(t.beatPos * 26);
+    int st = floor(t.beatPos * 26);                       // seed berganti cepat seiring beat
     noStroke();
     beginShape(QUADS);
     int row = 0;
@@ -433,10 +444,12 @@ class ElRuangTV {
   }
 
   // ---------- utilitas ----------
+  // hash 1D deterministik -> nilai 0..1 (pengganti random() agar stabil per beat)
   float hs(float n) {
     float v = sin(n * 12.9898 + 78.233) * 43758.5453;
     return v - floor(v);
   }
+  // smoothstep: 0 sebelum a, 1 setelah b, halus di antaranya
   float sst(float a, float b, float x) {
     float k = constrain((x - a) / (b - a), 0, 1);
     return k * k * (3 - 2 * k);

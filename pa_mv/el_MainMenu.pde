@@ -1,60 +1,56 @@
 // =====================================================================
-// el_MainMenu.pde
-// MAIN MENU - REALISTIC BACKROOMS + SUBTLE MOUSE PARALLAX + TERMINAL UI
+//  el_MainMenu.pde
+//  MAIN MENU - BACKROOMS 3D + MOUSE PARALLAX + UI TERMINAL
 //
-// v3 - fix pass:
-//   - lightF: half-wave smootherstep, range 0.72..1.10 (kontras lampu pulih)
-//   - detailLampu: lampu digambar sedikit di bawah plafon (CEIL+2) supaya
-//                  selalu terlihat, dengan frame tipis di sekelilingnya
-//   - detailWallpaper: garis vertikal dijadikan world-fixed (tidak lagi
-//                      camera-relative) supaya tidak "nabrak" dengan seam
-//   - stripWall: noStroke() di awal, gradient vertikal tetap (pseudo-AO)
-//   - fogCol & zBase kontinu tetap dipertahankan dari v2
+//  Panel UI:
+//    kiri atas   : terminal utama (ENTER THE ROOM + slider volume), diskala S
+//    kiri bawah  : CONTROLS
+//    kanan atas  : TEAM (nama kelompok + NIM)
+//    kanan bawah : GRAFIKA KOMPUTER
 //
-// Integrasi di pa_mv.pde tetap sama:
-//   ElMainMenu menu;
-//   menu = new ElMainMenu(fontJepang, VOLUME);
-//   menu.show();                 // panggil di draw()
-//   menu.selesai                 // true setelah fade-out PLAY selesai
-//
-// Input tetap diteruskan dari sketch utama:
-//   void mousePressed()  { if (menu != null) menu.mousePressed(); }
-//   void mouseDragged()  { if (menu != null) menu.mouseDragged(); }
-//   void mouseReleased() { if (menu != null) menu.mouseReleased(); }
+//  Pemakaian di pa_mv.pde:
+//    menu = new ElMainMenu(fontJepang, VOLUME);
+//    menu.show();                 // di draw()
+//    menu.selesai                 // true setelah fade-out PLAY selesai
+//    void mousePressed()  { if (!menu.selesai) { menu.mousePressed(); return; } }
+//    void mouseDragged()  { if (!menu.selesai) menu.mouseDragged(); }
+//    void mouseReleased() { if (!menu.selesai) menu.mouseReleased(); }
 // =====================================================================
 
 class ElMainMenu {
   // ------------------------- DUNIA 3D -------------------------------
-  final float FLOOR = 150;
-  final float CEIL = -110;
-  final float HALLW = 900;
-  final float STEP = 50;
-  final float FOG_END = 4200;
-  final float FAR = 4300;
+  final float FLOOR = 150;     // y lantai
+  final float CEIL  = -110;    // y plafon
+  final float HALLW = 900;     // setengah lebar lorong
+  final float STEP  = 50;      // jarak segmen sepanjang z
+  final float FOG_END = 4200;  // jarak kabut maksimum
+  final float FAR   = 4300;    // jarak pandang kamera
 
-  Canvas3D cv = new Canvas3D();
+  Canvas3D cv = new Canvas3D();   // kanvas offscreen 3D
   PFont font;
-  PImage vig;
+  PImage vig;                     // tekstur vignette layar
 
-  float volume;
-  boolean selesai = false;
-  boolean memudar = false;
-  boolean dragging = false;
+  float volume;                   // volume saat ini (0..1)
+  boolean selesai = false;        // true setelah fade-out PLAY selesai
+  boolean memudar = false;        // true selama fade-out
+  boolean dragging = false;       // true saat slider volume sedang di-drag
 
-  int tMulai;
-  int tPlay;
+  int tMulai;                     // waktu menu mulai (untuk fade-in & animasi)
+  int tPlay;                      // waktu PLAY ditekan (untuk fade-out)
 
-  // Posisi mouse yang sudah dihaluskan (-1 sampai 1).
+  // Posisi mouse yang sudah dihaluskan (-1..1)
   float mx = 0;
   float my = 0;
 
-  float hPlay = 0;
-  float hVol = 0;
+  float hPlay = 0;                // hover PLAY (0..1)
+  float hVol  = 0;                // hover volume (0..1)
 
-  // UI terminal.
-  float uiX = 42;
-  float uiY = 38;
-  float sliderW = 210;
+  // ------------------------- UI TERMINAL ----------------------------
+  float S = 1.3;                  // skala panel utama
+  final float PAD = 20;           // margin kiri-kanan di dalam panel
+  float uiX = 42;                 // posisi X panel utama
+  float uiY = 38;                 // posisi Y panel utama
+  float sliderW = 210;            // lebar slider volume (satuan dasar, sebelum dikali S)
 
   ElMainMenu(PFont f, float volAwal) {
     font = f;
@@ -64,7 +60,7 @@ class ElMainMenu {
   }
 
   // ------------------------------------------------------------------
-  // VIGNETTE
+  // VIGNETTE: gradasi hitam di tepi layar
   // ------------------------------------------------------------------
   void buatVignette() {
     vig = createImage(width, height, ARGB);
@@ -84,48 +80,28 @@ class ElMainMenu {
   }
 
   // ------------------------------------------------------------------
-  // POSISI UI
+  // POSISI UI (sudah dikali S, dipakai untuk deteksi mouse & layout)
   // ------------------------------------------------------------------
-  float panelW() {
-    return min(340, width * 0.43);
-  }
-
-  float panelH() {
-    return 330;
-  }
-
-  float playX() {
-    return uiX + 20;
-  }
-
-  float playY() {
-    return uiY + 226;
-  }
-
-  float sliderX0() {
-    return uiX + 22;
-  }
-
-  float sliderX1() {
-    return sliderX0() + sliderW;
-  }
-
-  float sliderY() {
-    return uiY + 294;
-  }
+  float panelWBase() { return min(340, width * 0.43); }
+  float panelW()     { return panelWBase() * S; }
+  float panelH()     { return 330 * S; }
+  float playY()      { return uiY + 226 * S; }
+  float sliderX0()   { return uiX + PAD * S; }
+  float sliderX1()   { return sliderX0() + sliderW * S; }
+  float sliderY()    { return uiY + 294 * S; }
 
   boolean overPlay() {
-    return mouseX >= uiX + 12 &&
-           mouseX <= uiX + panelW() - 12 &&
-           mouseY >= playY() - 22 &&
-           mouseY <= playY() + 20;
+    return mouseX >= uiX + 12 * S &&
+           mouseX <= uiX + panelW() - 12 * S &&
+           mouseY >= playY() - 22 * S &&
+           mouseY <= playY() + 20 * S;
   }
 
   boolean overVol() {
-    return mouseX >= sliderX0() - 8 &&
-           mouseX <= sliderX1() + 48 &&
-           mouseY >= sliderY() - 18 &&
-           mouseY <= sliderY() + 18;
+    return mouseX >= sliderX0() - 8 * S &&
+           mouseX <= sliderX1() + 48 * S &&
+           mouseY >= sliderY() - 18 * S &&
+           mouseY <= sliderY() + 18 * S;
   }
 
   // ------------------------------------------------------------------
@@ -138,7 +114,7 @@ class ElMainMenu {
   }
 
   // Kembalikan menu ke state awal supaya bisa ditampilkan lagi.
-  // Volume sengaja TIDAK direset — pilihan user terakhir tetap dipakai.
+  // Volume sengaja TIDAK direset - pilihan user terakhir tetap dipakai.
   void reset() {
     selesai = false;
     memudar = false;
@@ -152,7 +128,7 @@ class ElMainMenu {
   }
 
   void setVolDariMouse() {
-    volume = constrain((mouseX - sliderX0()) / sliderW, 0, 1);
+    volume = constrain((mouseX - sliderX0()) / (sliderW * S), 0, 1);
   }
 
   void mousePressed() {
@@ -178,9 +154,9 @@ class ElMainMenu {
   // TAMPIL UTAMA
   // ------------------------------------------------------------------
   void show() {
-    float t = (millis() - tMulai) / 1000.0;
+    float t = (millis() - tMulai) / 1000.0;   // detik sejak menu muncul
 
-    // Mouse tracking halus. Nilai kecil menjaga gerakan tetap subtle.
+    // Mouse tracking halus (lerp lambat = gerakan subtle)
     float tx = (mouseX / (float) width - 0.5) * 2;
     float ty = (mouseY / (float) height - 0.5) * 2;
 
@@ -191,21 +167,24 @@ class ElMainMenu {
     boolean hv = !memudar && (overVol() || dragging);
 
     hPlay = lerp(hPlay, hp ? 1 : 0, 0.13);
-    hVol = lerp(hVol, hv ? 1 : 0, 0.13);
+    hVol  = lerp(hVol,  hv ? 1 : 0, 0.13);
 
     if (hp || hv) cursor(HAND);
     else cursor(ARROW);
 
     scene3D(t);
 
-    // Semua UI digambar dalam 2D agar tidak ikut bergerak bersama kamera.
+    // Semua UI digambar dalam 2D agar tidak ikut bergerak bersama kamera
     hint(DISABLE_DEPTH_TEST);
     noLights();
     image(vig, 0, 0, width, height);
 
-    gambarTerminal(t);
+    gambarTerminal(t);   // kiri atas
+    gambarKontrol(t);    // kiri bawah
+    gambarTim(t);        // kanan atas
+    gambarMatkul(t);     // kanan bawah
 
-    // Fade-in saat menu muncul dan fade-out ketika PLAY ditekan.
+    // Fade-in saat menu muncul & fade-out ketika PLAY ditekan
     float aIn = 255 * (1 - constrain(t / 1.6, 0, 1));
     float aOut = memudar
       ? 255 * constrain((millis() - tPlay) / 850.0, 0, 1)
@@ -228,109 +207,132 @@ class ElMainMenu {
   }
 
   // ------------------------------------------------------------------
-  // TERMINAL UI - KIRI ATAS
+  // HELPER PANEL (gaya terminal seragam).
+  // `corner`: 0 = kiri atas, 1 = kanan atas, 2 = kiri bawah, 3 = kanan bawah
   // ------------------------------------------------------------------
-  void gambarTerminal(float t) {
-    float w = panelW();
-    float h = panelH();
-
-    // Panel transparan gelap, bukan kotak solid.
+  void panelDasar(float x, float y, float w, float h, int corner) {
     noStroke();
     fill(8, 8, 5, 174);
-    rect(uiX, uiY, w, h, 3);
+    rect(x, y, w, h, 3);
 
-    // Garis tepi dan aksen terminal.
     noFill();
     stroke(190, 174, 112, 105);
     strokeWeight(1);
-    rect(uiX, uiY, w, h, 3);
+    rect(x, y, w, h, 3);
 
+    // aksen sudut (garis emas tebal)
     stroke(220, 202, 137, 190);
     strokeWeight(2);
-    line(uiX, uiY, uiX + 42, uiY);
-    line(uiX, uiY, uiX, uiY + 42);
+    if (corner == 0) {
+      line(x, y, x + 42, y);
+      line(x, y, x, y + 42);
+    } else if (corner == 1) {
+      line(x + w, y, x + w - 42, y);
+      line(x + w, y, x + w, y + 42);
+    } else if (corner == 2) {
+      line(x, y + h, x + 42, y + h);
+      line(x, y + h, x, y + h - 42);
+    } else {
+      line(x + w, y + h, x + w - 42, y + h);
+      line(x + w, y + h, x + w, y + h - 42);
+    }
     noStroke();
+  }
+
+  // ------------------------------------------------------------------
+  // TERMINAL UI - KIRI ATAS (digambar dalam satuan dasar, lalu diskala S)
+  // ------------------------------------------------------------------
+  void gambarTerminal(float t) {
+    float w = panelWBase();
+    float h = 330;
+
+    pushMatrix();
+    translate(uiX, uiY);
+    scale(S);
+    // mulai dari sini koordinat lokal: (0,0) = pojok kiri atas panel
+
+    panelDasar(0, 0, w, h, 0);
 
     textFont(font);
     textAlign(LEFT, CENTER);
 
-    // Header kecil.
+    // Header kecil
     textSize(10);
     fill(190, 178, 135);
-    text("L T R  //  ENVIRONMENTAL TERMINAL", uiX + 18, uiY + 19);
+    text("L T R  //  ENVIRONMENTAL TERMINAL", PAD, 19);
 
-    // Indikator status.
+    // Indikator status
     float pulse = 125 + 45 * sin(millis() * 0.003);
     noStroke();
     fill(205, 190, 115, pulse);
-    ellipse(uiX + 22, uiY + 49, 6, 6);
+    ellipse(PAD + 3, 49, 6, 6);
 
     textSize(10);
     fill(177, 168, 128);
-    text("SIGNAL DETECTED", uiX + 34, uiY + 49);
+    text("SIGNAL DETECTED", PAD + 15, 49);
 
     textAlign(RIGHT, CENTER);
     fill(130, 123, 94);
-    text("VER 01.00", uiX + w - 17, uiY + 49);
+    text("VER 01.00", w - PAD, 49);
 
-    // Judul utama.
+    // Judul utama
     textAlign(LEFT, CENTER);
     textSize(min(31, w * 0.095));
     fill(0, 150);
-    text("LOOPING THE ROOM", uiX + 19 + 1, uiY + 91 + 2);
+    text("LOOPING THE ROOM", PAD + 1, 91 + 2);   // bayangan judul
     fill(231, 218, 169);
-    text("LOOPING THE ROOM", uiX + 19, uiY + 91);
+    text("LOOPING THE ROOM", PAD, 91);
 
-    // Deskripsi.
+    // Deskripsi
     textSize(10);
     fill(159, 150, 115);
-    text("YOU ARE NOT SUPPOSED TO BE HERE.", uiX + 20, uiY + 119);
+    text("YOU ARE NOT SUPPOSED TO BE HERE.", PAD, 119);
 
-    // Garis pemisah.
+    // Garis pemisah
     stroke(160, 145, 91, 105);
     strokeWeight(1);
-    line(uiX + 18, uiY + 145, uiX + w - 18, uiY + 145);
+    line(PAD, 145, w - PAD, 145);
     noStroke();
 
-    // Informasi lokasi.
+    // Info lokasi
     textSize(9);
     fill(126, 119, 91);
-    text("CURRENT LOCATION", uiX + 20, uiY + 165);
+    text("CURRENT LOCATION", PAD, 165);
     textSize(12);
     fill(207, 194, 145);
-    text("LEVEL  0  /  THE LOBBY", uiX + 20, uiY + 184);
+    text("LEVEL  0  /  THE LOBBY", PAD, 184);
 
-    // Tombol PLAY.
-    float py = playY();
+    // Tombol PLAY
+    float py = 226;
     if (hPlay > 0.01) {
       noStroke();
       fill(222, 205, 139, 17 * hPlay);
-      rect(uiX + 12, py - 18, w - 24, 36, 2);
+      rect(12, py - 18, w - 24, 36, 2);
     }
 
     stroke(lerpColor(color(115, 105, 72), color(224, 207, 143), hPlay));
     strokeWeight(1);
-    line(uiX + 18, py + 20, uiX + w - 18, py + 20);
+    line(PAD, py + 20, w - PAD, py + 20);
     noStroke();
 
     textAlign(LEFT, CENTER);
     textSize(15);
     fill(lerpColor(color(178, 168, 128), color(255, 238, 178), hPlay));
-    text(">  ENTER THE ROOM", uiX + 21, py);
+    text(">  ENTER THE ROOM", PAD, py);
 
-    // VOLUME.
+    // VOLUME
     textSize(9);
     fill(160, 150, 112);
-    text("AUDIO OUTPUT", uiX + 20, uiY + 265);
+    text("AUDIO OUTPUT", PAD, 265);
 
     textAlign(RIGHT, CENTER);
     fill(205, 193, 150);
-    text(nf(round(volume * 100), 3) + "%", uiX + w - 20, uiY + 265);
+    text(nf(round(volume * 100), 3) + "%", w - PAD, 265);
 
-    // Slider.
-    float x0 = sliderX0();
-    float x1 = sliderX1();
-    float sy = sliderY();
+    // Slider volume
+    float x0 = PAD;
+    float x1 = PAD + sliderW;
+    float sy = 294;
     float knob = x0 + volume * sliderW;
 
     stroke(91, 84, 58, 210);
@@ -347,17 +349,147 @@ class ElMainMenu {
     fill(231, 216, 164);
     ellipse(knob, sy, 6, 6);
 
-    // Footer.
+    // Footer
     textAlign(LEFT, CENTER);
     textSize(8);
     fill(111, 105, 82);
-    text("ESCAPE IS NOT GUARANTEED", uiX + 20, uiY + h - 13);
+    text("ESCAPE IS NOT GUARANTEED", PAD, h - 13);
 
-    // Jam berjalan kecil pada header terminal.
     textAlign(RIGHT, CENTER);
     fill(116, 109, 83);
-    text("SYS " + nf((int)(t * 10) % 10000, 4),
-         uiX + w - 18, uiY + h - 13);
+    text("SYS " + nf((int)(t * 10) % 10000, 4), w - PAD, h - 13);
+
+    popMatrix();
+  }
+
+  // ------------------------------------------------------------------
+  // INFO KONTROL - KIRI BAWAH
+  // ------------------------------------------------------------------
+  void gambarKontrol(float t) {
+    String[] tombol = { "R", "C", "ESC" };
+    String[] fungsi = { "RESTART", "CHECKPOINT", "BACK TO MENU" };
+
+    float w     = panelW();
+    float rowH  = 22;
+    float headH = 34;
+    float h     = headH + tombol.length * rowH + 16;
+    float x     = uiX;
+    float y     = height - uiY - h;
+
+    panelDasar(x, y, w, h, 2);
+
+    textFont(font);
+
+    // Header
+    textAlign(LEFT, CENTER);
+    textSize(10);
+    fill(190, 178, 135);
+    text("C O N T R O L S", x + PAD, y + 18);
+
+    // Garis pemisah
+    stroke(160, 145, 91, 105);
+    strokeWeight(1);
+    line(x + PAD, y + headH - 2, x + w - PAD, y + headH - 2);
+    noStroke();
+
+    // Baris kontrol: [ TOMBOL ]  FUNGSI
+    for (int i = 0; i < tombol.length; i++) {
+      float ry = y + headH + 8 + i * rowH + rowH * 0.5;
+
+      float kw = 40, kh = 16;
+      noFill();
+      stroke(190, 174, 112, 150);
+      strokeWeight(1);
+      rect(x + PAD, ry - kh / 2, kw, kh, 2);
+      noStroke();
+
+      textAlign(CENTER, CENTER);
+      textSize(9);
+      fill(231, 218, 169);
+      text(tombol[i], x + PAD + kw / 2, ry - 1);
+
+      textAlign(LEFT, CENTER);
+      textSize(10);
+      fill(177, 168, 128);
+      text(fungsi[i], x + PAD + kw + 14, ry - 1);
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // NAMA KELOMPOK + NIM - KANAN ATAS
+  // ------------------------------------------------------------------
+  void gambarTim(float t) {
+    String namaKel = "IWAK HARUAN MASAK HABANG";
+    String[] nim  = { "2409106028", "2409106034", "2409106039", "2409106044" };
+    String[] nama = { "Dwi Prasetyawan", "M. Naufal Rifyan Ilham", "M. Rizal Alfath", "Rangga Aditya Rahman" };
+
+    float rowH  = 22;
+    float headH = 34;
+    float kelH  = 40;
+    float w     = 340;
+    float h     = headH + kelH + nim.length * rowH + 16;
+    float x     = width - uiX - w;
+    float y     = uiY;
+
+    panelDasar(x, y, w, h, 1);
+
+    textFont(font);
+
+    // Header
+    textAlign(LEFT, CENTER);
+    textSize(10);
+    fill(190, 178, 135);
+    text("T E A M  //  OPERATORS", x + PAD, y + 18);
+
+    stroke(160, 145, 91, 105);
+    strokeWeight(1);
+    line(x + PAD, y + headH - 2, x + w - PAD, y + headH - 2);
+    noStroke();
+
+    // Nama kelompok
+    textSize(min(15, (w - PAD * 2) / 17.0));
+    fill(0, 150);
+    text(namaKel, x + PAD + 1, y + headH + 20 + 1);
+    fill(231, 218, 169);
+    text(namaKel, x + PAD, y + headH + 20);
+
+    stroke(160, 145, 91, 70);
+    strokeWeight(1);
+    line(x + PAD, y + headH + kelH - 2, x + w - PAD, y + headH + kelH - 2);
+    noStroke();
+
+    // Daftar anggota: NIM (kiri) + nama
+    for (int i = 0; i < nim.length; i++) {
+      float ry = y + headH + kelH + 4 + i * rowH + rowH * 0.5;
+
+      textAlign(LEFT, CENTER);
+      textSize(10);
+      fill(140, 131, 98);
+      text(nim[i], x + PAD, ry);
+
+      fill(207, 194, 145);
+      text(nama[i], x + PAD + 86, ry);
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // PANEL KECIL - KANAN BAWAH
+  // ------------------------------------------------------------------
+  void gambarMatkul(float t) {
+    String teks = "GRAFIKA KOMPUTER";
+
+    textFont(font);
+    textSize(13);
+    float w = textWidth(teks) + PAD * 2;
+    float h = 40;
+    float x = width - uiX - w;
+    float y = height - uiY - h;
+
+    panelDasar(x, y, w, h, 3);
+
+    textAlign(CENTER, CENTER);
+    fill(231, 218, 169);
+    text(teks, x + w / 2, y + h / 2 - 1);
   }
 
   // ------------------------------------------------------------------
@@ -371,7 +503,7 @@ class ElMainMenu {
     g.noLights();
     g.perspective(radians(70), (float)g.width / g.height, 10, 6000);
 
-    // Kamera maju perlahan. Respons mouse dibatasi agar tidak berlebihan.
+    // Kamera maju perlahan + respon mouse dibatasi agar tidak berlebihan
     float camZ = -t * 28;
     float idleX = sin(t * 0.32) * 5;
     float idleY = sin(t * 0.48) * 2.5;
@@ -388,48 +520,45 @@ class ElMainMenu {
       0, 1, 0
     );
 
-    float zBase = camZ + 100;          // kontinu
+    float zBase = camZ + 100;
     int n = (int)(FAR / STEP);
 
-    // Lantai & plafon.
-    strip(g, camZ, zBase, n,
-          -HALLW, FLOOR, HALLW, FLOOR, 77, 65, 43);
+    // Lantai & plafon
+    strip(g, camZ, zBase, n, -HALLW, FLOOR, HALLW, FLOOR, 77, 65, 43);
+    strip(g, camZ, zBase, n, -HALLW, CEIL, HALLW, CEIL, 125, 115, 82);
 
-    strip(g, camZ, zBase, n,
-          -HALLW, CEIL, HALLW, CEIL, 125, 115, 82);
-
-    // Dinding: stripWall dengan gradient vertikal tipis (pseudo-AO).
+    // Dinding dengan gradient vertikal tipis (pseudo-AO)
     stripWall(g, camZ, zBase, n, -HALLW, 177, 163, 111);
     stripWall(g, camZ, zBase, n,  HALLW, 166, 152, 101);
 
-    // Detail dinding.
+    // Detail dinding
     detailWallpaper(g, camZ);
     detailBaseboard(g, camZ);
     detailCarpet(g, camZ);
 
-    // Lampu plafon.
+    // Lampu plafon
     detailLampu(g, camZ);
 
-    // Pilar.
+    // Pilar
     int kp = (int)floor(camZ / 450.0) + 1;
     for (int k = kp; k > kp - 11; k--) {
       pilar(g, camZ, -380, k * 450);
       pilar(g, camZ,  380, k * 450 + 225);
     }
 
-    // Debu.
+    // Debu
     detailDebu(g, camZ, t);
 
     cv.end();
   }
 
   // ------------------------------------------------------------------
-  // DETAIL WALLPAPER  (v3 - semua world-fixed)
+  // DETAIL WALLPAPER (semua world-fixed)
   // ------------------------------------------------------------------
   void detailWallpaper(PGraphics g, float camZ) {
     int awal = (int)floor(camZ / 600.0) + 1;
 
-    // --- Seam horizontal tiap 600 unit (world-fixed) ---
+    // Seam tiap 600 unit
     for (int k = awal; k > awal - 9; k--) {
       float z = k * 600;
       float dist = abs(z - camZ);
@@ -439,16 +568,12 @@ class ElMainMenu {
       g.stroke(c);
       g.strokeWeight(2);
 
-      g.line(-HALLW + 2, CEIL + 8, z,
-             -HALLW + 2, FLOOR - 8, z);
-      g.line(HALLW - 2, CEIL + 8, z,
-             HALLW - 2, FLOOR - 8, z);
+      g.line(-HALLW + 2, CEIL + 8, z, -HALLW + 2, FLOOR - 8, z);
+      g.line(HALLW - 2, CEIL + 8, z,  HALLW - 2, FLOOR - 8, z);
       g.noStroke();
     }
 
-    // --- Garis vertikal tipis tiap 125 unit (world-fixed) ---
-    // Sebelumnya: z = camZ + 150 - i*125  (mengikuti kamera -> "nabrak")
-    // Sekarang : snap ke grid world 125 unit
+    // Garis vertikal tipis tiap 125 unit
     int jumlah = 40;
     int startGrid = (int)floor((camZ + 200) / 125.0);
     for (int i = 0; i < jumlah; i++) {
@@ -460,14 +585,12 @@ class ElMainMenu {
       g.stroke(c);
       g.strokeWeight(1);
 
-      g.line(-HALLW + 1, CEIL + 5, z,
-             -HALLW + 1, FLOOR - 5, z);
-      g.line(HALLW - 1, CEIL + 5, z,
-             HALLW - 1, FLOOR - 5, z);
+      g.line(-HALLW + 1, CEIL + 5, z, -HALLW + 1, FLOOR - 5, z);
+      g.line(HALLW - 1, CEIL + 5, z,  HALLW - 1, FLOOR - 5, z);
       g.noStroke();
     }
 
-    // --- Panel/lekukan dinding tiap 600 unit (world-fixed) ---
+    // Panel/lekukan dinding tiap 600 unit
     for (int k = awal; k > awal - 7; k--) {
       float z = k * 600 - 300;
       float dist = abs(z - camZ);
@@ -476,7 +599,7 @@ class ElMainMenu {
       color gelap  = fogCol(115, 103, 69, dist, 0.75);
       color terang = fogCol(193, 178, 123, dist, 0.8);
 
-      // Sisi kiri.
+      // Sisi kiri
       quad4(g, gelap,
             -HALLW + 3, CEIL + 15, z,
             -HALLW + 3, FLOOR - 35, z,
@@ -485,11 +608,10 @@ class ElMainMenu {
 
       g.stroke(terang);
       g.strokeWeight(1);
-      g.line(-HALLW + 4, CEIL + 18, z - 10,
-             -HALLW + 4, FLOOR - 38, z - 10);
+      g.line(-HALLW + 4, CEIL + 18, z - 10, -HALLW + 4, FLOOR - 38, z - 10);
       g.noStroke();
 
-      // Sisi kanan.
+      // Sisi kanan
       quad4(g, gelap,
             HALLW - 3, CEIL + 15, z,
             HALLW - 3, FLOOR - 35, z,
@@ -499,7 +621,7 @@ class ElMainMenu {
   }
 
   // ------------------------------------------------------------------
-  // BASEBOARD
+  // BASEBOARD (garis plint bawah dinding)
   // ------------------------------------------------------------------
   void detailBaseboard(PGraphics g, float camZ) {
     float zBase = camZ + 100;
@@ -510,10 +632,8 @@ class ElMainMenu {
       color c = fogCol(210, 203, 178, abs(z - camZ), 0.9);
       g.stroke(c);
 
-      g.line(-HALLW + 1, FLOOR - 25, z,
-             -HALLW + 1, FLOOR - 3, z);
-      g.line(HALLW - 1, FLOOR - 25, z,
-             HALLW - 1, FLOOR - 3, z);
+      g.line(-HALLW + 1, FLOOR - 25, z, -HALLW + 1, FLOOR - 3, z);
+      g.line(HALLW - 1, FLOOR - 25, z,  HALLW - 1, FLOOR - 3, z);
     }
     g.noStroke();
   }
@@ -554,47 +674,46 @@ class ElMainMenu {
       float x = -HALLW + i * 50;
       color c = fogCol(93, 78, 52, 500, 0.45);
       g.stroke(c);
-      g.line(x,      FLOOR - 1, camZ + 100,
-             x + 12, FLOOR - 1, camZ - 1800);
+      g.line(x, FLOOR - 1, camZ + 100, x + 12, FLOOR - 1, camZ - 1800);
     }
     g.noStroke();
   }
 
   // ------------------------------------------------------------------
-  // LAMPU FLUORESCENT (v3 - lampu terlihat jelas)
+  // LAMPU FLUORESCENT
   // ------------------------------------------------------------------
   void detailLampu(PGraphics g, float camZ) {
     int kz = (int)floor(camZ / 300.0) + 1;
     int jml = (int)(FAR / 300.0) + 2;
-    float[] px = { -540, -180, 180, 540 };
+    float[] px = { -540, -180, 180, 540 };   // posisi X 4 lampu per baris
 
     for (int k = kz; k > kz - jml; k--) {
       float zl = k * 300;
       float dist = abs(zl - camZ);
       if (dist > FOG_END) continue;
 
-      float flick = 0.94 + 0.06 * noise(k * 0.73, millis() * 0.0007);
+      float flick = 0.94 + 0.06 * noise(k * 0.73, millis() * 0.0007);   // kedip halus
       color frame = fogCol(100, 94, 67, dist, 0.9);
       color lamp  = fogCol(255, 250, 225, dist, 1.35 * flick);
 
       for (int i = 0; i < px.length; i++) {
         float x = px[i];
 
-        // Frame luar: sedikit di bawah plafon (lebih dekat kamera)
+        // Frame luar
         quad4(g, frame,
               x - 88, CEIL + 1.2, zl - 88,
               x + 88, CEIL + 1.2, zl - 88,
               x + 88, CEIL + 1.2, zl + 88,
               x - 88, CEIL + 1.2, zl + 88);
 
-        // Permukaan lampu: lebih rendah (lebih dekat kamera) -> selalu terlihat
+        // Permukaan lampu
         quad4(g, lamp,
               x - 73, CEIL + 2.0, zl - 73,
               x + 73, CEIL + 2.0, zl - 73,
               x + 73, CEIL + 2.0, zl + 73,
               x - 73, CEIL + 2.0, zl + 73);
 
-        // Garis pemisah panel.
+        // Garis pemisah panel
         g.stroke(fogCol(190, 184, 155, dist, 0.9));
         g.strokeWeight(2);
         g.line(x, CEIL + 1.0, zl - 70, x, CEIL + 1.0, zl + 70);
@@ -626,24 +745,20 @@ class ElMainMenu {
   }
 
   // ------------------------------------------------------------------
-  // PENCAHAYAAN (v3 - kontras lampu pulih)
+  // PENCAHAYAAN
   // ------------------------------------------------------------------
+  // Kekuatan cahaya sebagai fungsi z (fluktuasi dengan periode 300 unit)
   float lightF(float z) {
-    // half-wave: 1 di tengah lampu, 0 di antara lampu
     float c = cos(z * TWO_PI / 300.0);
     float s = constrain(c, 0, 1);
-
-    // smootherstep: transisi halus, tidak ada knee
-    float e = s * s * s * (s * (s * 6 - 15) + 10);
-
-    // range asli dipertahankan: 0.72 .. 1.10
+    float e = s * s * s * (s * (s * 6 - 15) + 10);   // smoothstep di sisi atas
     return 0.72 + 0.38 * e;
   }
 
+  // Warna dengan kabut jarak & faktor cahaya
   color fogCol(float r, float gg, float b, float dist, float lf) {
     float k = constrain(1 - dist / FOG_END, 0, 1);
-    // smootherstep pada falloff kabut
-    k = k * k * k * (k * (k * 6 - 15) + 10);
+    k = k * k * k * (k * (k * 6 - 15) + 10);          // smoothstep
 
     float m = k * lf;
 
@@ -674,13 +789,12 @@ class ElMainMenu {
 
   // ------------------------------------------------------------------
   // STRIP DINDING DENGAN GRADIENT VERTIKAL (pseudo-AO)
-  // Terang di dekat plafon, sedikit meredup ke lantai.
   // ------------------------------------------------------------------
   void stripWall(PGraphics g, float camZ, float zBase, int n,
                  float x, float r, float gg, float b) {
     g.noStroke();
 
-    int bands = 6;
+    int bands = 6;                           // jumlah pita vertikal
     for (int bIdx = 0; bIdx < bands; bIdx++) {
       float t1 = bIdx       / (float)bands;
       float t2 = (bIdx + 1) / (float)bands;
@@ -689,7 +803,7 @@ class ElMainMenu {
       float y2 = lerp(CEIL, FLOOR, t2);
 
       float tMid = (t1 + t2) * 0.5;
-      float ao = 0.75 + 0.25 * (1 - tMid);   // terang di atas, redup di bawah
+      float ao = 0.75 + 0.25 * (1 - tMid);   // makin dekat lantai makin gelap
 
       g.beginShape(QUAD_STRIP);
       for (int i = 0; i <= n; i++) {
@@ -729,44 +843,47 @@ class ElMainMenu {
     if (z > camZ + 200) return;
 
     float lf = lightF(z);
-    float dir = (x < 0) ? 1 : -1;
+    float dir = (x < 0) ? 1 : -1;               // arah menghadap ke tengah
 
-    float w  = 65;
-    float bw = 75;
-    float bh = 26;
-    float xi = x + dir * w;
-    float xb = x + dir * bw;
+    float w  = 65;                              // setengah lebar pilar
+    float bw = 75;                              // setengah lebar alas
+    float bh = 26;                              // tinggi alas
+    float xi = x + dir * w;                     // sisi dalam pilar
+    float xb = x + dir * bw;                    // sisi luar alas
 
+    // sisi depan
     quad4(g, fogCol(205, 193, 145, dist, lf),
           x - w, CEIL,  z + w,
           x + w, CEIL,  z + w,
           x + w, FLOOR, z + w,
           x - w, FLOOR, z + w);
 
+    // sisi dalam (menghadap lorong)
     quad4(g, fogCol(145, 134, 96, dist, lf),
           xi, CEIL,  z - w,
           xi, CEIL,  z + w,
           xi, FLOOR, z + w,
           xi, FLOOR, z - w);
 
+    // alas atas
     quad4(g, fogCol(225, 219, 197, dist, lf),
           x - bw, FLOOR - bh, z + bw,
           x + bw, FLOOR - bh, z + bw,
           x + bw, FLOOR,      z + bw,
           x - bw, FLOOR,      z + bw);
 
+    // alas sisi luar
     quad4(g, fogCol(175, 168, 148, dist, lf),
           xb, FLOOR - bh, z - bw,
           xb, FLOOR - bh, z + bw,
           xb, FLOOR,      z + bw,
           xb, FLOOR,      z - bw);
 
+    // garis vertikal dekoratif di sisi depan
     g.stroke(fogCol(105, 97, 68, dist, lf));
     g.strokeWeight(1);
-    g.line(x - 35, CEIL + 12, z + w + 1,
-           x - 35, FLOOR - 35, z + w + 1);
-    g.line(x + 35, CEIL + 12, z + w + 1,
-           x + 35, FLOOR - 35, z + w + 1);
+    g.line(x - 35, CEIL + 12, z + w + 1, x - 35, FLOOR - 35, z + w + 1);
+    g.line(x + 35, CEIL + 12, z + w + 1, x + 35, FLOOR - 35, z + w + 1);
     g.noStroke();
   }
 }

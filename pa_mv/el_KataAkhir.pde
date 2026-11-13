@@ -1,24 +1,23 @@
 // =====================================================================
 //  el_KataAkhir.pde   [ELEMENT 2D - LAYAR HITAM + LIRIK HURUF DEMI HURUF]
 //  Beat 290 -> 297 (setelah adegan spiral zoom, ditutup mosaik di 289-290).
-//    - Layar hitam, distorsi putih SEDIKIT saja, datang dari tepi atas
-//      (garis tipis condong ke atas + goresan menetes dari atas layar).
-//    - Lirik beat 292 ("くるくるくりかえす") muncul HURUF DEMI HURUF, tiap huruf
-//      meloncat lalu mendarat DI SAMPING huruf sebelumnya (posisi akhir sudah
-//      tetap di tengah), sampai satu kata penuh. Teks diambil dari ElLirik.
-//    - Saat beat terakhir (RED_AT) seluruh teks LANGSUNG jadi merah.
+//    - Layar hitam, distorsi putih SEDIKIT saja, datang dari tepi atas.
+//    - Lirik beat 292 ("くるくるくりかえす") muncul HURUF DEMI HURUF,
+//      tiap huruf meloncat lalu mendarat. Teks diambil dari ElLirik.
+//    - Saat beat RED_AT seluruh teks LANGSUNG jadi merah.
 //  Dihitung dari clock.beatPos -> aman pause/restart; pakai hash, bukan random().
 //
-//  kataAkhir = new ElKataAkhir(fontJepang);        // setup()
-//  kataAkhir.show(clock, lirik);                   // draw(), sesudah helpMe, sebelum UI
+//  Pemakaian:
+//    kataAkhir = new ElKataAkhir(fontJepang);     // setup()
+//    kataAkhir.show(clock, lirik);                // draw(), sesudah helpMe, sebelum UI
 // =====================================================================
 class ElKataAkhir {
-  PFont font;
-  final float START      = 290;    // layar hitam mulai
-  final float TEXT_START = 292;    // huruf pertama muncul (= beat lirik)
-  final float PER_HURUF  = 0.4;    // jarak antar huruf (beat)
-  final float RED_AT     = 296;    // teks jadi merah
-  final float END_BEAT   = 297;    // selesai
+  PFont font;                       // font untuk lirik
+  final float START      = 290;     // layar hitam mulai
+  final float TEXT_START = 292;     // huruf pertama muncul (= beat lirik)
+  final float PER_HURUF  = 0.4;     // jarak antar huruf (beat)
+  final float RED_AT     = 296;     // teks jadi merah
+  final float END_BEAT   = 297;     // selesai
 
   ElKataAkhir(PFont font) { this.font = font; }
 
@@ -33,7 +32,7 @@ class ElKataAkhir {
     fill(0);
     rect(0, 0, width, height);
 
-    drawTopDistortion(t, 0.55 * sst(START, START + 1.5, b));   // sedikit, makin ada pelan-pelan
+    drawTopDistortion(t, 0.55 * sst(START, START + 1.5, b));   // distorsi muncul pelan-pelan
     drawText(t, lk, b);
 
     hint(ENABLE_DEPTH_TEST);
@@ -41,10 +40,11 @@ class ElKataAkhir {
   }
 
   // ---------- distorsi putih tipis dari atas ----------
+  // `k` = kekuatan distorsi (0..0.55)
   void drawTopDistortion(BeatClock t, float k) {
     if (k < 0.01) return;
     int st = ((int) (t.beatPos * 22)) % 400;
-    float am = constrain(k / 0.4, 0, 1);
+    float am = constrain(k / 0.4, 0, 1);        // alpha pengali
     noStroke();
 
     // cahaya tipis di tepi atas, berkedip
@@ -80,6 +80,7 @@ class ElKataAkhir {
 
   // ---------- lirik: muncul huruf demi huruf, meloncat lalu mendarat ----------
   void drawText(BeatClock t, ElLirik lk, float b) {
+    // cari baris lirik yang mulai tepat di TEXT_START
     String s = null;
     for (int i = 0; i < lk.lirik.length; i++) {
       if (lk.lirikBeat[i] == (int) TEXT_START) s = lk.lirik[i];
@@ -88,25 +89,25 @@ class ElKataAkhir {
     int n = s.length();
     if (n == 0) return;
 
-    float fs  = height * 0.08;
-    float adv = fs * 1.35;
-    float x0  = width / 2.0 - (n - 1) * adv / 2.0;
+    float fs  = height * 0.08;                       // ukuran huruf
+    float adv = fs * 1.35;                           // jarak antar huruf
+    float x0  = width / 2.0 - (n - 1) * adv / 2.0;   // posisi X huruf pertama
     float y   = height * 0.5;
-    boolean merah = (b >= RED_AT);
+    boolean merah = (b >= RED_AT);                   // true = warna merah
 
     textFont(font, fs);
     textAlign(CENTER, CENTER);
 
     for (int ki = 0; ki < n; ki++) {
       float u = b - (TEXT_START + ki * PER_HURUF);
-      if (u < 0) continue;
+      if (u < 0) continue;                           // huruf belum muncul
 
-      float p  = constrain(u / 0.5, 0, 1);
-      float e  = (1 - p) * (1 - p);
-      float yo = -e * fs * 0.9;
-      float an = e * 0.5 * ((ki % 2 == 0) ? 1 : -1);
-      float sc = 1 + 0.25 * e;
-      float al = 110 + 145 * p;
+      float p  = constrain(u / 0.5, 0, 1);           // 0 = baru muncul, 1 = mendarat
+      float e  = (1 - p) * (1 - p);                  // easing
+      float yo = -e * fs * 0.9;                      // melayang di atas saat baru muncul
+      float an = e * 0.5 * ((ki % 2 == 0) ? 1 : -1); // miring bergantian
+      float sc = 1 + 0.25 * e;                       // sedikit lebih besar saat melayang
+      float al = 110 + 145 * p;                      // alpha bertambah saat mendarat
 
       pushMatrix();
       translate(x0 + ki * adv, y + yo);
@@ -123,11 +124,13 @@ class ElKataAkhir {
   // ---------- utilitas ----------
   float rnd(int st, int i, int salt) { return hs(st * 97 + i * 13 + salt * 1009); }
 
+  // hash 1D deterministik -> 0..1
   float hs(float n) {
     float v = sin(n * 12.9898 + 78.233) * 43758.5453;
     return v - floor(v);
   }
 
+  // smoothstep: 0 sebelum a, 1 setelah b
   float sst(float a, float b, float x) {
     float k = constrain((x - a) / (b - a), 0, 1);
     return k * k * (3 - 2 * k);

@@ -2,11 +2,14 @@
 //  el_Bola.pde   [ELEMENT 2D]
 //  Bola/bentuk di tengah layar yang berdenyut tiap beat dan berganti bentuk.
 //
-//  bola = new ElBola(100);     // di setup()  (100 = ukuran dasar)
-//  bola.show(clock);           // di draw()
+//  Pemakaian:
+//    bola = new ElBola(100);     // di setup()  (100 = ukuran dasar)
+//    bola.show(clock);           // di draw()
 // =====================================================================
 class ElBola {
-  float size, targetSize, baseSize;
+  float size;          // ukuran saat ini (hasil lerp)
+  float targetSize;    // ukuran tujuan (memudar kembali ke baseSize)
+  float baseSize;      // ukuran dasar (dari parameter)
 
   ElBola(float baseSize) {
     this.baseSize = baseSize;
@@ -14,7 +17,7 @@ class ElBola {
   }
 
   void show(BeatClock t) {
-    if (t.newBeat) targetSize = baseSize * 2.5;    // denyut tiap beat
+    if (t.newBeat) targetSize = baseSize * 2.5;   // denyut tiap beat
     size       = lerp(size, targetSize, 0.3);
     targetSize = lerp(targetSize, baseSize, 0.1);
 
@@ -26,7 +29,7 @@ class ElBola {
     noStroke();
     rectMode(CENTER);
 
-    int bentuk = t.beat % 4;
+    int bentuk = t.beat % 4;                      // ganti bentuk tiap beat
     if (bentuk == 0) {
       circle(0, 0, size);
     } else if (bentuk == 1) {

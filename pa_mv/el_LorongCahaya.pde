@@ -1,46 +1,55 @@
 // =====================================================================
 //  el_LorongCahaya.pde   [ELEMENT 3D & 2D TERPISAH]
 //  Adegan beat 200-228 (ref. video: lorong gelap yang berkedip).
-//    - Lorong gelap + plafon kotak. Tiap 2 beat ada KILAT: lorong menyala sebentar,
-//      di ujungnya ada bola cahaya (putih, tepi oranye), lalu redup sampai hitam.
-//      Tiap kilat sudut lorong berganti (seperti loncat maju), makin lama makin lebar.
+//    - Lorong gelap + plafon kotak. Tiap `kilatTiap` beat ada KILAT:
+//      lorong menyala sebentar, di ujungnya bola cahaya, lalu redup sampai hitam.
+//      Tiap kilat sudut lorong berganti (loncat maju), makin lama makin lebar.
 //    - Lirik muncul HURUF DEMI HURUF (meloncat lalu mendarat) di tengah layar.
-//    - Beat 224: bola cahaya jadi pintu lengkung gelap.
-//    - Beat 228+: glitch (pita warna berundak, lempeng putih) + huruf terakhir
-//      menumpuk sampai memenuhi layar. (Baru terlihat kalau draw() masih memanggil
-//      element ini setelah beat 228.)
+//    - Beat archMulai: bola cahaya jadi pintu lengkung gelap + monster raksasa.
+//    - Beat glitchMulai: glitch (pita warna berundak, lempeng putih).
 //
-//  Teks lirik DIAMBIL dari ElLirik (lirik[] & lirikBeat[]) - tidak ditulis ulang di sini.
+//  Teks lirik DIAMBIL dari ElLirik (lirik[] & lirikBeat[]) - tidak ditulis ulang.
 //  Semua gerak dihitung dari clock.beatPos -> aman saat pause / restart.
 //
-//  lorongCahaya = new ElLorongCahaya(fontJepang);     // setup()
-//  lorongCahaya.show3D(clock);                         // draw(), bagian "1. LATAR 3D"
-//  lorongCahaya.show2D(clock, lirik);                  // draw(), bagian "2. ELEMENT 2D"
+//  Pemakaian:
+//    lorongCahaya = new ElLorongCahaya(fontJepang);   // setup()
+//    lorongCahaya.show3D(clock);                       // draw(), bagian "1. LATAR 3D"
+//    lorongCahaya.show2D(clock, lirik);                // draw(), bagian "2. ELEMENT 2D"
 // =====================================================================
 class ElLorongCahaya {
-  PFont font;
-  Canvas3D cv3d = new Canvas3D(2);
+  PFont font;                          // font untuk lirik
+  Canvas3D cv3d = new Canvas3D(2);     // kanvas offscreen 3D (zoom 2x)
   PImage orbImg;                       // tekstur bola cahaya (dibuat sekali)
+  PImage bacteria;                     // tekstur monster di ujung lorong
+  float beatPosNow = 0;                // salinan beatPos terakhir
+  float lihatMuka  = 0;                // 0 = lihat kaki, 1 = lihat muka monster
+
+  // ---- MONSTER BESAR ----
+  float monsterH        = 800;   // tinggi monster (unit dunia). Lorong tingginya 200, jadi raksasa
+  float monsterFaceFrac = 0.18;  // posisi muka dari ATAS gambar (0 = puncak, 1 = kaki)
+  float monsterTurun    = 140;   // jarak kaki monster di bawah lantai (efek menjulang)
 
   // ---- JADWAL (beat) ----
   float mulai       = 200;   // adegan mulai: kilat pertama + baris lirik pertama
-  float archMulai   = 224;   // bola cahaya berubah jadi pintu lengkung
+  float archMulai   = 226;   // bola cahaya berubah jadi pintu lengkung
   float glitchMulai = 228;   // glitch + huruf terakhir menumpuk
   float kilatTiap   = 2;     // jarak antar kilat (beat)
   float[] pola = { 1.0, 0.45, 0.85, 0.45 };   // kuat tiap kilat (berulang)
 
-  // ---- hasil hitungan tiap frame (diisi calc) ----
-  float kilat;       // 0..1  terang saat ini
-  float hitU;        // beat sejak kilat terakhir
-  float archU;       // beat sejak archMulai
-  int   fase;        // 0 lorong berkedip | 1 pintu lengkung | 2 glitch
-  int   tembakan;    // nomor kilat (untuk variasi lorong)
-  float lebarLorong = 140;
-  float camX, camY;
-  boolean sembunyiTeks = false;   // true = teks lirik tidak digambar (dipakai adegan ElHelpMe)
+  // ---- hasil hitungan tiap frame (diisi calc()) ----
+  float kilat;               // 0..1 terang saat ini
+  float hitU;                // beat sejak kilat terakhir
+  float archU;               // beat sejak archMulai
+  int   fase;                // 0 = lorong berkedip | 1 = pintu lengkung | 2 = glitch
+  int   tembakan;            // nomor kilat (untuk variasi lorong)
+  float lebarLorong = 140;   // lebar lorong saat ini
+  float camX, camY;          // posisi kamera (X & Y)
+  boolean sembunyiTeks = false;   // true = teks lirik tidak digambar (dipakai ElHelpMe)
 
   ElLorongCahaya(PFont font) {
     this.font = font;
+    bacteria = loadImage("assets/bacteria.png");
+    if (bacteria == null) println("⚠ assets/bacteria.png tidak ditemukan");
     buildOrb();
   }
 
@@ -52,7 +61,7 @@ class ElLorongCahaya {
     PGraphics g = cv3d.begin();
     g.background(0);
     if (fase < 2 && kilat > 0.01) {
-      drawLorong(g, (fase == 1) ? kilat * 0.6 : kilat);
+      drawLorong(g, kilat);
     }
     cv3d.end();
   }
@@ -79,24 +88,31 @@ class ElLorongCahaya {
   //  HITUNGAN WAKTU (semua dari beatPos)
   // ===================================================================
   void calc(BeatClock t) {
+    beatPosNow = t.beatPos;
     float rel = t.beatPos - mulai;
-    if (rel < 0) { kilat = 0; hitU = 0; archU = 0; fase = 0; tembakan = 0; return; }
+    if (rel < 0) { kilat=0; hitU=0; archU=0; fase=0; tembakan=0; lihatMuka=0; return; }
 
     tembakan = (int) (rel / kilatTiap);
     hitU     = rel - tembakan * kilatTiap;
     archU    = t.beatPos - archMulai;
 
-    kilat  = pola[tembakan % pola.length] * exp(-3.0 * hitU);   // menyala lalu redup
-    kilat *= 0.92 + 0.08 * sin(hitU * 70);                      // sedikit kedip neon
+    kilat  = pola[tembakan % pola.length] * exp(-3.0 * hitU);   // memudar eksponensial
+    kilat *= 0.92 + 0.08 * sin(hitU * 70);                      // getar halus
 
     fase = (t.beatPos >= glitchMulai) ? 2 : ((t.beatPos >= archMulai) ? 1 : 0);
-    if (fase == 1) kilat = 0.55 + 0.45 * exp(-2.5 * hitU);      // pintu tetap menyala redup
+    if (fase == 1) {
+      float naik = 0.35 + 0.65 * sst(227.0, 227.9, t.beatPos);
+      if (t.beatPos >= 227.0) kilat = max(kilat, naik);         // fase arch: cahaya tidak terlalu redup
+    }
     if (fase == 2) kilat = 1;
     kilat = constrain(kilat, 0, 1);
 
-    lebarLorong = lerp(140, 330, sst(2, 9, tembakan));          // makin lama makin lebar
-    camX = (hs(tembakan * 5 + 1) - 0.5) * 40;
+    lebarLorong = lerp(140, 330, sst(2, 9, tembakan));          // lorong makin lebar
+    camX = (hs(tembakan * 5 + 1) - 0.5) * 40;                   // geser kamera X acak tapi deterministik
     camY = (hs(tembakan * 9 + 2) - 0.5) * 14;
+
+    // KAMERA NAIK: 227.0 -> 227.95 smoothstep
+    lihatMuka = (fase == 1) ? sst(227.0, 227.95, t.beatPos) : 0;
   }
 
   // ===================================================================
@@ -104,22 +120,28 @@ class ElLorongCahaya {
   //  Cahaya datang dari ujung lorong: makin jauh makin terang.
   // ===================================================================
   void drawLorong(PGraphics g, float lum) {
-    final float H   = 100;      // setengah tinggi
-    final float LEN = 420;      // panjang lorong
-    final int   N   = 6;        // jumlah segmen
-    final float SEG = LEN / N;
-    float wH = lebarLorong;
+    final float H=100, LEN=420; final int N=6; final float SEG=LEN/N;
+    float wH = lebarLorong;                       // setengah lebar lorong
 
-    g.perspective(radians(62 - 4 * constrain(hitU / 2.0, 0, 1)), (float) width / height, 5, 3000);
-    g.camera(camX, camY, 0,  camX, camY, -LEN,  0, 1, 0);
-    g.noLights();
-    g.noStroke();
+    // ▼ KAMERA
+    float footY = H + monsterTurun;
+    float camYNow    = camY;
+    float targetYNow = camY;
+    if (fase == 1) {
+      float faceY = (footY - monsterH) + monsterH * monsterFaceFrac;   // tinggi muka monster
+      targetYNow = lerp(camY, faceY, lihatMuka);   // lurus ke depan -> muka
+      camYNow    = lerp(camY, -55,   lihatMuka);
+    }
+
+    g.perspective(radians(62 - 4 * constrain(hitU/2.0, 0, 1)), (float)width/height, 5, 3000);
+    g.camera(camX, camYNow, 0,  camX, targetYNow, -LEN,  0, 1, 0);
+    g.noLights(); g.noStroke();
 
     for (int i = 0; i < N; i++) {
       float z0 = -i * SEG;
       float z1 = -(i + 1) * SEG;
       float zc = (z0 + z1) / 2;
-      float fb = lum * (0.22 + 0.78 * pow((i + 1) / (float) N, 1.6));
+      float fb = lum * (0.22 + 0.78 * pow((i + 1) / (float) N, 1.6));   // kecerahan per segmen
       int world = tembakan * 3 + i;
 
       // lantai karpet
@@ -145,7 +167,7 @@ class ElLorongCahaya {
       if (hs(world * 2 + 1) > 0.40) drawPintu(g, -wH + 1, zc, fb, 1);
       if (hs(world * 2 + 2) > 0.50) drawPintu(g,  wH - 1, zc, fb, -1);
 
-      // kotak rendah di dasar dinding (hanya kalau sudah lebar)
+      // kotak rendah di dasar dinding (hanya kalau lorong sudah lebar)
       if (wH > 200 && hs(world * 3 + 5) > 0.75) {
         g.pushMatrix();
         g.translate(wH - 26, H - 14, zc);
@@ -154,7 +176,7 @@ class ElLorongCahaya {
         g.popMatrix();
       }
 
-      // garis kisi plafon (terlihat terang seperti di video)
+      // garis kisi plafon
       g.stroke(235 * fb, 228 * fb, 200 * fb);
       g.strokeWeight(1.5);
       g.line(-wH, -H + 0.5, z0, wH, -H + 0.5, z0);
@@ -165,16 +187,50 @@ class ElLorongCahaya {
       g.noStroke();
     }
 
-    // dinding ujung (hampir tertutup bola cahaya 2D)
+    // dinding ujung lorong (paling jauh)
     g.fill(25 * lum, 22 * lum, 14 * lum);
     g.beginShape(QUADS);
     g.vertex(-wH, -H, -LEN); g.vertex(wH, -H, -LEN); g.vertex(wH, H, -LEN); g.vertex(-wH, H, -LEN);
     g.endShape();
+
+    // monster (hanya fase 1 ke atas)
+    if (fase >= 1 && bacteria != null) {
+      drawMonsterBesar(g, LEN, H);
+    }
   }
 
-  // pintu gelap menempel di dinding. sisi = 1 (kiri) / -1 (kanan), x = posisi dinding
+  // Monster raksasa di ujung lorong. Kaki berpijak di lantai, orb jadi
+  // backlight di belakangnya. Keduanya ikut terang-redup mengikuti kilat.
+  void drawMonsterBesar(PGraphics g, float LEN, float H) {
+    float am = sst(0, 0, archU);          // 0 di awal, 1 di akhir
+    if (am < 0.001) return;
+
+    float hM = monsterH * am;
+    float wM = hM * bacteria.width / (float) bacteria.height;   // jaga aspek
+    float zO = -LEN + 2;                  // z orb (di belakang monster)
+    float zM = -LEN + 4;                  // z monster
+    float footY = H + monsterTurun;
+
+    g.hint(DISABLE_DEPTH_TEST);           // supaya tidak terpotong plafon/dinding
+    g.noStroke();
+    // MONSTER: kaki di lantai (y = footY), tubuh menjulang ke atas
+    g.tint(255 * kilat, 240 * kilat, 205 * kilat);   // putih hangat x kilat
+    g.beginShape(QUADS);
+    g.texture(bacteria);
+    g.vertex(-wM / 2, footY - hM, zM, 0,              0);
+    g.vertex( wM / 2, footY - hM, zM, bacteria.width, 0);
+    g.vertex( wM / 2, footY,      zM, bacteria.width, bacteria.height);
+    g.vertex(-wM / 2, footY,      zM, 0,              bacteria.height);
+    g.endShape();
+    g.noTint();
+
+    g.hint(ENABLE_DEPTH_TEST);
+  }
+
+  // Pintu gelap menempel di dinding. `sisi` = 1 (kiri) / -1 (kanan),
+  // `x` = posisi dinding, `zc` = z tengah pintu, `fb` = faktor kecerahan.
   void drawPintu(PGraphics g, float x, float zc, float fb, int sisi) {
-    float dz = 16;
+    float dz = 16;                        // setengah lebar pintu
     float yAtas = -45;
     float yBawah = 100;
     // bingkai (sedikit lebih terang)
@@ -199,24 +255,12 @@ class ElLorongCahaya {
     float cx = width * 0.5;
     float cy = height * 0.49;
     float Rd = height * ((fase == 1) ? 0.19 : 0.26) * (1 + 0.05 * kilat);   // radius cakram
-    float Ri = Rd / 0.62;                                                   // setengah ukuran gambar
+    float Ri = Rd / 0.62;                                                    // setengah ukuran gambar
 
     imageMode(CORNER);
     tint(255, 255 * kilat);
     image(orbImg, cx - Ri, cy - Ri, Ri * 2, Ri * 2);
     noTint();
-
-    if (fase == 1) {
-      float am = sst(0, 0.35, archU);          // pintu "tumbuh" sebentar
-      float aw = Rd * 0.42 * am;
-      float ay = cy - Rd * 0.2;
-      noStroke();
-      fill(8, 6, 4, 255 * kilat);
-      rectMode(CORNERS);
-      rect(cx - aw, ay, cx + aw, cy + Rd * 0.62);
-      ellipseMode(CENTER);
-      ellipse(cx, ay, aw * 2, aw * 2);
-    }
   }
 
   // ===================================================================
@@ -225,14 +269,15 @@ class ElLorongCahaya {
   //  mengganggu element lain yang memakai random()).
   // ===================================================================
   void drawGlitch(BeatClock t) {
-    int s = t.eighthBeat;
+    int s = t.eighthBeat;                                // seed berubah ~8x per beat
     float cx = width * 0.5 + (hs(s * 3 + 1) - 0.5) * 14;
     float cy = height * 0.5 + (hs(s * 3 + 2) - 0.5) * 8;
-    float R  = height * 0.26;
-    float fl = 0.8 + 0.2 * hs(s * 3 + 3);
+    float R  = height * 0.26;                            // radius dasar
+    float fl = 0.8 + 0.2 * hs(s * 3 + 3);                // kilap
 
     noStroke();
     ellipseMode(CENTER);
+    // halo berundak
     fill( 80,  52, 22, 220 * fl); ellipse(cx, cy, R * 2.70, R * 2.70);
     fill(215, 150, 60, 235 * fl); ellipse(cx, cy, R * 2.35, R * 2.35);
     fill(172, 168, 98, 255);      ellipse(cx, cy, R * 2.15, R * 2.15);
@@ -300,7 +345,7 @@ class ElLorongCahaya {
 
     int extra = 0;
     if (idx == akhir && t.beatPos >= glitchMulai) {
-      extra = min(70, (int) ((t.beatPos - glitchMulai) * 3.0));
+      extra = min(70, (int) ((t.beatPos - glitchMulai) * 3.0));   // huruf ekstra menumpuk
     }
     int total = n + extra;
 
@@ -345,7 +390,7 @@ class ElLorongCahaya {
   // ===================================================================
   //  UTILITAS
   // ===================================================================
-  // tekstur bola: cakram putih-hijau berbintik, tepi oranye, halo oranye halus
+  // Tekstur bola: cakram putih-hijau berbintik, tepi oranye, halo oranye halus
   void buildOrb() {
     int n = 512;
     orbImg = createImage(n, n, ARGB);
@@ -384,7 +429,7 @@ class ElLorongCahaya {
     orbImg.updatePixels();
   }
 
-  // angka acak tetap (0..1) dari sebuah bilangan -> sama setiap diputar
+  // Hash 1D deterministik -> 0..1
   float hs(float n) {
     float v = sin(n * 12.9898 + 78.233) * 43758.5453;
     return v - floor(v);

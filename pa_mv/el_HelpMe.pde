@@ -1,37 +1,44 @@
 // =====================================================================
-//  helpMe = new ElHelpMe();                 // setup()
-//  helpMe.show(clock);                      // draw(), PALING AKHIR sebelum UI
+//  el_HelpMe.pde   [ELEMENT 2D - ZOOM PINTU + GLITCH + TEKS BASE64]
+//  Adegan beat 227.5-231:
+//    - Foto layar di-zoom ke arah pintu (zoom blur berlapis)
+//    - Layar hitam + distorsi putih (noise, garis, blok, goresan)
+//    - Teks Base64 "SGVscCBNZQ==" (= "Help Me") muncul huruf demi huruf
+//      dengan sebagian huruf berubah merah, lalu memudar menjelang transisi
+//  Dihitung dari clock.beatPos -> aman pause/restart.
 //
-//  Atur jadwal di konstanta di bawah. (1 subBeat = 0.5 beat)
+//  Pemakaian:
+//    helpMe = new ElHelpMe();       // setup()
+//    helpMe.show(clock);            // draw(), PALING AKHIR sebelum UI
 // =====================================================================
 class ElHelpMe {
   // ---- JADWAL (beat) ----
-  final float ZOOM_START  = 227.5;
-  final float BLACK_START = 228.0;
-  final float TEXT_START  = 229.5;
-  final float TEXT_FADE   = 0.8;
-  final float FADE_START  = 230.0; 
-  final float END_BEAT    = 231.0;   
-  final float ZOOM_MAX    = 16;    
-  final float FOCUS_X     = 0.50;  
-  final float FOCUS_Y     = 0.53;    
-  final int   RED_MIN     = 3;     
-  final int   RED_MAX     = 5;
+  final float ZOOM_START  = 227.5;   // mulai zoom ke pintu
+  final float BLACK_START = 228.0;   // layar jadi hitam penuh
+  final float TEXT_START  = 229.5;   // huruf pertama teks muncul
+  final float TEXT_FADE   = 0.8;     // lama kemunculan teks (beat)
+  final float FADE_START  = 230.0;   // distorsi mulai memudar
+  final float END_BEAT    = 231.0;   // selesai
+  final float ZOOM_MAX    = 16;      // pembesaran maksimum saat zoom
+  final float FOCUS_X     = 0.50;    // titik fokus zoom (pecahan lebar layar)
+  final float FOCUS_Y     = 0.53;    // titik fokus zoom (pecahan tinggi layar)
+  final int   RED_MIN     = 3;       // jumlah minimum huruf merah
+  final int   RED_MAX     = 5;       // jumlah maksimum huruf merah
 
-  String kode;       // teks Base64
-  PFont font;        // font monospace
-  PImage snap = null;
-  float am = 1;      // pengali keterlihatan garis distorsi (1 = penuh, 0 = hilang)
+  String kode;       // teks Base64 dari "Help Me" -> "SGVscCBNZQ=="
+  PFont font;        // font monospace untuk teks Base64
+  PImage snap = null;   // snapshot layar (diambil sekali di awal zoom)
+  float am = 1;      // pengali alpha garis distorsi (1 = penuh, 0 = hilang)
 
   ElHelpMe() {
     kode = java.util.Base64.getEncoder().encodeToString(
-             "Help Me".getBytes(java.nio.charset.StandardCharsets.UTF_8));   // SGVscCBNZQ==
+             "Help Me".getBytes(java.nio.charset.StandardCharsets.UTF_8));
     font = createFont("Monospaced.bold", 96);
   }
 
   void show(BeatClock t) {
     float b = t.beatPos;
-    if (b < ZOOM_START) { snap = null; return; }   // belum waktunya (atau lagu di-restart)
+    if (b < ZOOM_START) { snap = null; return; }   // belum waktunya / lagu restart
     if (b >= END_BEAT) return;
 
     pushStyle();
@@ -41,12 +48,12 @@ class ElHelpMe {
     rectMode(CORNER);
 
     if (b < BLACK_START) {
-      if (snap == null) snap = get();               // foto layar sekali saja
+      if (snap == null) snap = get();               // foto layar sekali saat zoom mulai
       drawZoom(t, (b - ZOOM_START) / (BLACK_START - ZOOM_START));
     } else {
       fill(0);
       rect(0, 0, width, height);
-      float v = (b - BLACK_START) / (END_BEAT - BLACK_START);        // 0..1
+      float v = (b - BLACK_START) / (END_BEAT - BLACK_START);        // 0..1 progres fase hitam
       am = 1 - sst(FADE_START, END_BEAT, b);                         // garis memudar menjelang transisi
       float k = (0.55 + 0.45 * v + 0.20 * pow(1 - t.frac, 3)) * am;  // kerapatan distorsi
       drawDistortion(t, k);
@@ -60,19 +67,20 @@ class ElHelpMe {
   // ===================================================================
   //  ZOOM ke pintu: foto layar diperbesar dari titik pintu, makin lama makin cepat.
   //  Dua lapis bayangan lebih besar (transparan) memberi kesan zoom blur.
+  //  `u` = progres 0..1.
   // ===================================================================
   void drawZoom(BeatClock t, float u) {
     u = constrain(u, 0, 1);
     am = 1;
-    float fx = width * FOCUS_X;
-    float fy = height * FOCUS_Y;
+    float fx = width * FOCUS_X;     // x titik fokus
+    float fy = height * FOCUS_Y;    // y titik fokus
 
     fill(0);
     rect(0, 0, width, height);
 
-    zoomLayer(pow(u, 2.4), 255, fx, fy);
-    zoomLayer(pow(min(1, u + 0.08), 2.4), 85, fx, fy);
-    zoomLayer(pow(min(1, u + 0.16), 2.4), 45, fx, fy);
+    zoomLayer(pow(u, 2.4), 255, fx, fy);                        // lapis utama
+    zoomLayer(pow(min(1, u + 0.08), 2.4), 85, fx, fy);          // bayangan 1
+    zoomLayer(pow(min(1, u + 0.16), 2.4), 45, fx, fy);          // bayangan 2
 
     // makin dekat makin gelap (pintu menelan layar)
     noStroke();
@@ -84,14 +92,15 @@ class ElHelpMe {
     if (k > 0.01) drawDistortion(t, k);
   }
 
-  // satu lapis foto: e = progres zoom 0..1 (sudah di-ease)
+  // Satu lapis foto. `e` = progres zoom (0..1, sudah di-ease),
+  // `alpha` = transparansi, `fx/fy` = titik fokus awal.
   void zoomLayer(float e, float alpha, float fx, float fy) {
     float s  = pow(ZOOM_MAX, e);
-    float px = lerp(fx, width * 0.5, e);     // pintu pelan-pelan bergeser ke tengah
+    float px = lerp(fx, width * 0.5, e);     // titik fokus perlahan bergeser ke tengah
     float py = lerp(fy, height * 0.5, e);
     pushMatrix();
     translate(px, py);
-    rotate(0.05 * e);                        // sedikit miring biar tidak steril
+    rotate(0.05 * e);                        // sedikit miring
     scale(s);
     translate(-fx, -fy);
     imageMode(CORNER);
@@ -102,11 +111,11 @@ class ElHelpMe {
   }
 
   // ===================================================================
-  //  DISTORSI PUTIH di atas hitam. k = kerapatan (0..~1.2).
+  //  DISTORSI PUTIH di atas hitam. `k` = kerapatan (0..~1.2).
   //  Berubah ~22x per beat (hampir tiap frame).
   // ===================================================================
   void drawDistortion(BeatClock t, float k) {
-    int st = ((int) (t.beatPos * 22)) % 400;
+    int st = ((int) (t.beatPos * 22)) % 400;    // seed berubah cepat seiring beat
     noStroke();
     rectMode(CORNER);
 
@@ -117,7 +126,7 @@ class ElHelpMe {
       rect(rnd(st, i, 2) * width, rnd(st, i, 3) * height, 1 + rnd(st, i, 4) * 3, 1 + rnd(st, i, 5) * 2);
     }
 
-    // 2. garis horizontal acak (panjang & tebal berbeda-beda)
+    // 2. garis horizontal acak
     int nl = (int) (10 + 34 * k);
     for (int i = 0; i < nl; i++) {
       float len = width * (0.06 + 0.94 * pow(rnd(st, i, 11), 2));
@@ -128,7 +137,7 @@ class ElHelpMe {
       rect(x, y, len, th);
     }
 
-    // 3. balok retakan lebar (tracking error) - tipis transparan, kadang bergeser
+    // 3. balok retakan lebar (tracking error)
     int nb = 1 + (int) (3 * k);
     for (int i = 0; i < nb; i++) {
       float y = rnd(st, i, 21) * height;
@@ -165,7 +174,7 @@ class ElHelpMe {
     fw(120);
     rect(0, ty + 30 + (rnd(st, 0, 47) - 0.5) * 6, width, 2);
 
-    // 7. kilap putih tipis, jarang (sengaja redup)
+    // 7. kilap putih tipis (jarang)
     if (rnd(st, 0, 51) < 0.07 * k) {
       fw(22 + 28 * rnd(st, 1, 51));
       rect(0, 0, width, height);
@@ -176,15 +185,15 @@ class ElHelpMe {
   //  TEKS BASE64: huruf menyala satu-satu dari distorsi, lalu bergetar.
   // ===================================================================
   void drawText(BeatClock t, float b) {
-    float p  = sst(TEXT_START, TEXT_START + TEXT_FADE, b);                 // 0..1 kemunculan
+    float p  = sst(TEXT_START, TEXT_START + TEXT_FADE, b);                 // 0..1 kemunculan teks
     float tp = constrain((b - TEXT_START) / (END_BEAT - TEXT_START), 0, 1); // 0..1 sampai selesai
     int st   = ((int) (b * 22)) % 400;
     int n    = kode.length();
 
-    float fs = height * 0.115;
+    float fs = height * 0.115;      // ukuran huruf
     textFont(font, fs);
     textAlign(CENTER, CENTER);
-    float cw = textWidth("0");                      // lebar huruf (monospace)
+    float cw = textWidth("0");      // lebar satu huruf (monospace)
     float cx = width * 0.5;
     float cy = height * 0.5;
     float x0 = cx - (n - 1) * cw * 0.5;
@@ -218,7 +227,7 @@ class ElHelpMe {
     scale(creep);
     translate(-cx, -cy);
     for (int i = 0; i < n; i++) {
-      if (rnd(st, i, 60) >= p) continue;            // huruf ini belum menyala
+      if (rnd(st, i, 60) >= p) continue;            // huruf belum menyala
       float a  = 255 * (0.25 + 0.75 * p);
       float sh = 1 - 0.6 * p;                       // getaran mengecil saat teks jelas
       float x  = x0 + i * cw + (rnd(st, i, 61) - 0.5) * 14 * sh;
@@ -259,6 +268,7 @@ class ElHelpMe {
     return hs(st * 97 + i * 13 + salt * 1009);
   }
 
+  // hash 1D deterministik -> nilai 0..1
   float hs(float n) {
     float v = sin(n * 12.9898 + 78.233) * 43758.5453;
     return v - floor(v);

@@ -4,24 +4,25 @@
 //  Menggantikan AudioManager.pde lama.
 // =====================================================================
 class BeatClock {
-  float bpm = 162;
-  float beatDuration;          // ms per beat
+  float bpm = 162;             // tempo lagu (beat per menit)
+  float beatDuration;          // durasi 1 beat (ms)
 
   float posMs;                 // posisi lagu (ms)
   float beatPos;               // posisi lagu dalam beat (pecahan, mis. 12.37)
   float frac;                  // 0..1 progres di dalam beat sekarang
 
-  int beat, subBeat, quarterBeat, eighthBeat;   // 1/1, 1/2, 1/4, 1/8
+  int beat, subBeat, quarterBeat, eighthBeat;   // penghitung ketukan: 1/1, 1/2, 1/4, 1/8
   boolean newBeat = false;     // true hanya di frame pertama saat beat berganti
 
-  int lastBeat = -1;
-  int lastSubBeat = -1;        // subBeat frame sebelumnya (untuk atSubBeat)
-  int prevSubBeat = -1;
+  int lastBeat = -1;           // nilai beat frame sebelumnya (untuk newBeat)
+  int lastSubBeat = -1;        // nilai subBeat frame sebelumnya
+  int prevSubBeat = -1;        // nilai subBeat dua frame lalu (untuk atSubBeat)
 
   BeatClock() {
     beatDuration = 60000.0 / bpm;
   }
 
+  // Update semua state dari posisi lagu (ms)
   void update(float posMs) {
     this.posMs  = posMs;
     beatPos     = posMs / beatDuration;
@@ -38,21 +39,21 @@ class BeatClock {
     lastSubBeat = subBeat;
   }
 
-  // dipanggil saat lagu di-restart / lompat
+  // Dipanggil saat lagu di-restart / lompat
   void reset() {
     lastBeat = -1;
     lastSubBeat = -1;
     prevSubBeat = -1;
   }
 
-  // TRUE sekali saja, tepat saat subBeat n baru dimulai (1 beat = 2 subBeat).
+  // TRUE sekali saja, tepat saat subBeat ke-n baru dimulai (1 beat = 2 subBeat).
   // Aman kalau ada frame yang ke-skip (pakai "melewati", bukan "sama dengan").
   // Setelah restart/jump (reset) tidak akan memicu salah.
   boolean atSubBeat(int n) {
     return prevSubBeat >= 0 && prevSubBeat < n && subBeat >= n;
   }
 
-  // beat sekarang ada di rentang [dari, sampai) ?   contoh: inBeat(8, 40)
+  // Beat sekarang ada di rentang [dari, sampai)?   contoh: inBeat(8, 40)
   boolean inBeat(int dari, int sampai) {
     return beat >= dari && beat < sampai;
   }
@@ -62,7 +63,7 @@ class BeatClock {
     return newBeat && beat == n;
   }
 
-  // progres 0..1 di dalam rentang beat (untuk animasi fade/zoom dsb)
+  // Progres 0..1 di dalam rentang beat (untuk animasi fade/zoom dsb)
   float progress(int dari, int sampai) {
     return constrain((beatPos - dari) / (float) (sampai - dari), 0, 1);
   }

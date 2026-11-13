@@ -10,8 +10,8 @@
 //      cv.end();                             // akhir show() -> ditempel ke layar
 // =====================================================================
 class Canvas3D {
-  PGraphics pg;
-  int antialias;
+  PGraphics pg;               // kanvas offscreen 3D
+  int antialias;              // tingkat antialiasing (default 4)
 
   Canvas3D() {
     this(4);
@@ -21,8 +21,9 @@ class Canvas3D {
     this.antialias = antialias;
   }
 
+  // Mulai sesi gambar 3D. Kanvas dibuat ulang otomatis kalau belum ada
+  // atau ukuran window berubah.
   PGraphics begin() {
-    // buat ulang kalau belum ada / ukuran window berubah
     if (pg == null || pg.width != width || pg.height != height) {
       pg = createGraphics(width, height, P3D);
       pg.smooth(antialias);
@@ -31,9 +32,10 @@ class Canvas3D {
     return pg;
   }
 
+  // Akhiri sesi & tempel hasil kanvas sebagai gambar 2D di layar
+  // (di belakang element 2D lainnya).
   void end() {
     pg.endDraw();
-    // tempel sebagai gambar 2D biasa di belakang element 2D
     hint(DISABLE_DEPTH_TEST);
     noLights();
     imageMode(CORNER);

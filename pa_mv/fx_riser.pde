@@ -1,25 +1,24 @@
 // =====================================================================
 //  fx_riser.pde   [EFEK SUARA]
-//  Suara "naik" (riser): nada sinus yang pitch-nya naik terus + desis noise,
-//  menaik dari beat awal sampai beat akhir lalu mati mendadak (pas layar TV padam).
-//  Disintesis langsung dengan library Sound (tidak butuh file audio).
+//  Suara "riser": nada sinus yang pitch-nya naik terus + desis noise,
+//  menaik dari beat awal sampai beat akhir lalu mati mendadak
+//  (pas layar TV padam). Disintesis lewat library Sound, tanpa file audio.
 //
-//  riser = new FxRiser(this, 100, 103);   // setup()   (mulai, selesai dalam beat)
-//  riser.update(clock, kontrol.isPlaying);// draw()    tiap frame
-//  riser.stopNow();                       // dipanggil saat restart
-//
-//  Ubah: volMax (keras), fLow/fHigh (rentang pitch), noiseVol (desis).
+//  Pemakaian:
+//    riser = new FxRiser(this, 100, 103);       // setup()
+//    riser.update(clock, kontrol.isPlaying);    // draw() tiap frame
+//    riser.stopNow();                           // saat restart
 // =====================================================================
 import processing.sound.*;
 
 class FxRiser {
-  SinOsc oscA, oscB;
-  WhiteNoise noiz;
-  float startBeat, endBeat;
-  float volMax = 0.07;     // volume puncak (lagu = VOLUME 0.1; sesuaikan)
-  float noiseVol = 0.03;
-  float fLow = 180, fHigh = 1700;
-  boolean on = false;
+  SinOsc oscA, oscB;           // dua sinus (oscB = harmonik 1.5x oscA)
+  WhiteNoise noiz;             // noise untuk desis
+  float startBeat, endBeat;    // rentang beat aktif
+  float volMax = 0.07;         // volume puncak (sesuaikan dengan VOLUME lagu)
+  float noiseVol = 0.03;       // volume noise maksimum
+  float fLow = 180, fHigh = 1700;  // rentang pitch (Hz) dari awal ke akhir
+  boolean on = false;          // true = sedang berbunyi
 
   FxRiser(PApplet app, float startBeat, float endBeat) {
     this.startBeat = startBeat;
@@ -33,9 +32,9 @@ class FxRiser {
     boolean want = playing && t.beatPos >= startBeat && t.beatPos < endBeat;
     if (!want) { stopNow(); return; }
     float p = (t.beatPos - startBeat) / (endBeat - startBeat);   // 0..1
-    float f = fLow * pow(fHigh / fLow, p * p);                   // naik eksponensial
-    float a = volMax * (0.15 + 0.85 * p);
-    float wob = 1 + 0.012 * sin(t.beatPos * TWO_PI * 4);         // sedikit bergetar
+    float f = fLow * pow(fHigh / fLow, p * p);                   // pitch naik eksponensial
+    float a = volMax * (0.15 + 0.85 * p);                        // volume naik pelan
+    float wob = 1 + 0.012 * sin(t.beatPos * TWO_PI * 4);         // sedikit getar
     if (!on) {
       oscA.play(f, a);
       oscB.play(f * 1.5 * wob, a * 0.5);

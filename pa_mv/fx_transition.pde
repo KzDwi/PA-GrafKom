@@ -1,32 +1,33 @@
 // =====================================================================
 //  fx_transition.pde   [EFEK VISUAL]
-//  Transisi 1: Layar flash menguning terang.           -> trigger()
-//  Transisi 2: Balok hitam menutup atas & bawah.       -> triggerPresser()
-//  Transisi 3: Cahaya dari tengah sampai putih penuh.  -> triggerLight()
-//  Semua digambar oleh show() (dipanggil sekali per frame di draw()).
+//  Transisi 1: layar flash menguning terang.            -> trigger()
+//  Transisi 2: balok hitam menutup atas & bawah.        -> triggerPresser()
+//  Transisi 3: cahaya dari tengah sampai putih penuh.   -> triggerLight()
+//  Glitch satu layar singkat.                           -> triggerGlitch()
+//  Semua digambar oleh show() / showGlitch() (dipanggil sekali per frame).
 // =====================================================================
 class FxTransition {
-  // Variabel untuk Flash
-  float flashAlpha = 0;
-  float rampUpSpeed = 15.0;  
-  float rampDownSpeed = 4.0; 
-  
-  // Variabel untuk Presser Hitam
-  float barHeight = 0; 
-  float presserSpeed = 20.0; // Kecepatan balok hitam menutup/membuka
-  
-  int state = 0; // 0: IDLE, 1: CLOSING/RAMP_UP, 2: OPENING/RAMP_DOWN
-  int type = 0;  // 1: Flash Kuning, 2: Presser Hitam, 3: Cahaya dari tengah
+  // ---- flash kuning ----
+  float flashAlpha = 0;          // alpha flash saat ini (0..255)
+  float rampUpSpeed = 15.0;      // kecepatan flash naik (alpha per frame)
+  float rampDownSpeed = 4.0;     // kecepatan flash turun (alpha per frame)
 
-  // Variabel untuk Glitch satu layar
-  int glitchDuration = 2;   // lama glitch dalam FRAME (1-2 frame)
-  int glitchFrames = 0;     // sisa frame glitch
+  // ---- presser hitam ----
+  float barHeight = 0;           // tinggi balok hitam atas/bawah (px)
+  float presserSpeed = 20.0;     // kecepatan balok menutup/membuka (px per frame)
 
-  // Variabel untuk Cahaya dari tengah (dihitung dari BEAT, bukan frame)
-  float lightRise = 3.0;    // lama (beat) dari trigger sampai layar putih penuh
-  float lightFade = 0.8;    // lama (beat) putih memudar sampai hilang
-  float lightStart = 0;     // beatPos saat triggerLight() dipanggil
-  PImage glowImg;           // tekstur gradasi radial (dibuat sekali)
+  int state = 0;                 // 0=IDLE, 1=fase tutup/naik, 2=fase buka/turun
+  int type  = 0;                 // 1=flash kuning, 2=presser, 3=cahaya tengah
+
+  // ---- glitch satu layar ----
+  int glitchDuration = 2;        // lama glitch (frame)
+  int glitchFrames = 0;          // sisa frame glitch aktif
+
+  // ---- cahaya dari tengah (dihitung dari BEAT, bukan frame) ----
+  float lightRise = 3.0;         // lama (beat) dari trigger sampai putih penuh
+  float lightFade = 0.8;         // lama (beat) putih memudar sampai hilang
+  float lightStart = 0;          // beatPos saat triggerLight() dipanggil
+  PImage glowImg;                // tekstur gradasi radial (dibuat sekali)
 
   FxTransition() {
     buildGlow();
@@ -42,12 +43,12 @@ class FxTransition {
     lightStart = 0;
   }
 
-  // Glitch satu layar, sangat singkat (glitchDuration frame)
+  // Glitch satu layar sangat singkat
   void triggerGlitch() {
     glitchFrames = glitchDuration;
   }
 
-  // Dipanggil PALING AKHIR sebelum UI, supaya seluruh layar ikut ter-glitch
+  // Dipanggil PALING AKHIR sebelum UI agar seluruh layar ikut ter-glitch
   void showGlitch() {
     if (glitchFrames <= 0) return;
     glitchFrames--;
@@ -61,7 +62,7 @@ class FxTransition {
     textureMode(NORMAL);
     tint(255);
 
-    // 1. Layar dipotong jadi pita horizontal, sebagian digeser kiri/kanan
+    // 1. layar dipotong jadi pita horizontal, sebagian digeser kiri/kanan
     float y = 0;
     while (y < height) {
       float h = min(random(8, 90), height - y);
@@ -80,7 +81,7 @@ class FxTransition {
     noTint();
     textureMode(IMAGE);
 
-    // 2. Pita warna ala RGB-split + blok putih
+    // 2. pita warna ala RGB-split + blok putih
     for (int i = 0; i < 5; i++) {
       if (random(1) < 0.5) fill(0, 255, 255, 90); else fill(255, 0, 80, 90);
       rect(0, random(height), width, random(4, 40));
@@ -91,21 +92,18 @@ class FxTransition {
     hint(ENABLE_DEPTH_TEST);
   }
 
-  // Panggil ini untuk transisi Flash lama
   void trigger() {
-    state = 1; 
+    state = 1;
     type = 1;
     flashAlpha = 0;
   }
 
-  // Panggil ini untuk transisi Presser Hitam
   void triggerPresser() {
     state = 1;
     type = 2;
     barHeight = 0;
   }
 
-  // Panggil ini untuk transisi Cahaya dari tengah.
   // Mulai dari beat saat dipanggil, putih penuh setelah lightRise beat,
   // lalu memudar selama lightFade beat.
   void triggerLight() {
@@ -115,7 +113,7 @@ class FxTransition {
   }
 
   void show() {
-    if (state == 0) return; // Jika tidak ada transisi aktif, lewati
+    if (state == 0) return;
 
     hint(DISABLE_DEPTH_TEST);
     noLights();
@@ -130,45 +128,41 @@ class FxTransition {
         flashAlpha += rampUpSpeed;
         if (flashAlpha >= 255) {
           flashAlpha = 255;
-          state = 2; 
+          state = 2;
         }
       } else if (state == 2) {
         flashAlpha -= rampDownSpeed;
         if (flashAlpha <= 0) {
           flashAlpha = 0;
-          state = 0; 
+          state = 0;
         }
       }
-      
-      fill(255, 245, 250, flashAlpha); 
+
+      fill(255, 245, 250, flashAlpha);
       rect(0, 0, width, height);
     }
-    
+
     // ==========================================
-    // TIPE 2: PRESSER HITAM (Dari atas & bawah)
+    // TIPE 2: PRESSER HITAM (dari atas & bawah)
     // ==========================================
     else if (type == 2) {
-      if (state == 1) { // Menutup ke tengah
+      if (state == 1) {                              // menutup ke tengah
         barHeight += presserSpeed;
         if (barHeight >= height / 2) {
-          barHeight = height / 2; // Rapat di tengah
-          state = 2; // Ganti fase jadi membuka kembali
+          barHeight = height / 2;
+          state = 2;
         }
-      } else if (state == 2) { // Membuka kembali
+      } else if (state == 2) {                       // membuka kembali
         barHeight -= presserSpeed;
         if (barHeight <= 0) {
           barHeight = 0;
-          state = 0; 
+          state = 0;
         }
       }
-      
-      fill(0); // Warna hitam pekat
-      
-      // Gambar balok atas
-      rect(0, 0, width, barHeight);
-      
-      // Gambar balok bawah (mulai dari tinggi layar dikurangi ketebalan balok)
-      rect(0, height - barHeight, width, barHeight);
+
+      fill(0);
+      rect(0, 0, width, barHeight);                  // balok atas
+      rect(0, height - barHeight, width, barHeight); // balok bawah
     }
 
     // ==========================================
@@ -181,12 +175,11 @@ class FxTransition {
     hint(ENABLE_DEPTH_TEST);
   }
 
-  // Titik cahaya kecil di tengah, makin besar (pelan di awal, melesat di akhir)
-  // sampai layar putih penuh, lalu memudar. Dihitung dari clock.beatPos, jadi
-  // ikut berhenti saat lagu di-pause.
+  // Titik cahaya kecil di tengah, membesar sampai putih penuh, lalu memudar.
+  // Dihitung dari clock.beatPos sehingga ikut berhenti saat lagu di-pause.
   void drawLight() {
     float b = clock.beatPos - lightStart;          // beat sejak trigger
-    if (b < 0 || b >= lightRise + lightFade) {     // selesai (atau lagu di-restart mundur)
+    if (b < 0 || b >= lightRise + lightFade) {     // selesai / lagu mundur
       state = 0;
       return;
     }
@@ -199,8 +192,8 @@ class FxTransition {
     if (b < lightRise) {
       // fase mendekat: p 0 -> 1
       float p = b / lightRise;
-      float e = p * p * p;                         // pelan dulu, lalu tiba-tiba melesat
-      R     = lerp(40, diag * 1.2, e);             // radius halo (px)
+      float e = p * p * p;                         // pelan di awal, melesat di akhir
+      R     = lerp(40, diag * 1.2, e);
       haloA = 255 * constrain(p * 4, 0, 1);
       coreA = 255 * constrain(p * 3, 0, 1);
       washA = 255 * sstep(0.6, 1.0, p);            // putih penuh menjelang puncak
@@ -234,7 +227,7 @@ class FxTransition {
     popStyle();
   }
 
-  // Bikin tekstur gradasi radial putih-hangat: terang di pusat, transparan di tepi
+  // Buat tekstur gradasi radial putih-hangat: terang di pusat, transparan di tepi.
   void buildGlow() {
     int n = 256;
     glowImg = createImage(n, n, ARGB);
@@ -250,7 +243,7 @@ class FxTransition {
     glowImg.updatePixels();
   }
 
-  // smoothstep sederhana: 0 sebelum a, 1 setelah b, halus di antaranya
+  // smoothstep: 0 sebelum a, 1 setelah b, halus di antaranya
   float sstep(float a, float b, float x) {
     float k = constrain((x - a) / (b - a), 0, 1);
     return k * k * (3 - 2 * k);
