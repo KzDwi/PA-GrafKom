@@ -33,6 +33,7 @@ class ElJudul {
 
 class ElLirik {
   PFont font;        // font untuk lirik
+  PFont fontZpix;    // font khusus beat 72-99
 
   // daftar baris lirik (satu baris = satu entri di sini)
   String[] lirik = {
@@ -95,7 +96,7 @@ class ElLirik {
     3,  3,  3,  3,
     1,  1,  1,  1,
     3,  3,  3,  3,
-    4,  4,
+    6,  6,
     5,  5,
     7,  8,
     8,  4,
@@ -110,22 +111,102 @@ class ElLirik {
 
   ElLirik(PFont font) {
     this.font = font;
+    this.fontZpix = createFont("zpix.ttf", 32);
   }
 
   void show(BeatClock t) {
     hint(DISABLE_DEPTH_TEST);
     noLights();
-    textFont(font);
+    textFont(t.beat >= 72 && t.beat < 100 ? fontZpix : font);
     fill(255);
     textAlign(CENTER, CENTER);
     textSize(30);
     for (int i = 0; i < lirik.length; i++) {
       // tampilkan baris yang sedang aktif (dari lirikBeat[i] selama durasiLirik[i])
       if (t.inBeat(lirikBeat[i], lirikBeat[i] + durasiLirik[i])) {
-        text(lirik[i], width / 2, height - 120);
+        float alpha = lyricAlpha(lirik[i], t.beatPos);
+        if (alpha <= 0) continue;
+        fill(255, alpha);
+        float shake = lyricShake(t.beat);
+        if (shake > 0) drawShakyLine(lirik[i], width / 2, height - 120, shake, t.beatPos);
+        else if (lirik[i].equals("終わらないロード") && t.beatPos >= 180) {
+          drawWideDashLine(lirik[i], width / 2, height - 120, t.beatPos);
+        } else text(lirik[i], width / 2, height - 120);
       }
     }
     hint(ENABLE_DEPTH_TEST);
+  }
+
+  float lyricAlpha(String line, float beatPos) {
+    if (!line.equals("空回るソウト") || beatPos < 173) return 255;
+    int fadeStep = (int) floor(beatPos * 1.2) - (int) floor(173 * 1.2);
+    float fadeProgress = constrain(fadeStep / 5.0, 0, 1);
+    return 255 * (1 - fadeProgress);
+  }
+
+  float lyricShake(int beat) {
+    if (beat >= 104 && beat < 111 || beat >= 120 && beat < 126) return 2;
+    if (beat >= 111 && beat < 114 || beat >= 127 && beat < 130) return 5;
+    if (beat >= 114 && beat < 117 || beat >= 131 && beat < 134) return 10;
+    if (beat >= 117 && beat < 120 || beat >= 135 && beat < 138) return 20;
+
+    if (beat >= 232 && beat < 238 || beat >= 248 && beat < 254) return 2;
+    if (beat >= 239 && beat < 241 || beat >= 255 && beat < 257) return 5;
+    if (beat >= 242 && beat < 244 || beat >= 258 && beat < 260) return 10;
+    if (beat >= 245 && beat < 247 || beat >= 261 && beat < 263) return 20;
+    return 0;
+  }
+
+  void drawShakyLine(String line, float centerX, float y, float amount, float beatPos) {
+    pushStyle();
+    textAlign(LEFT, CENTER);
+    float x = centerX - textWidth(line) / 2;
+    int shakeStep = (int) floor(beatPos * 1.5);
+    for (int i = 0; i < line.length(); i++) {
+      String letter = line.substring(i, i + 1);
+      float dx = randomLetterOffset(shakeStep, i, 0, amount);
+      float dy = randomLetterOffset(shakeStep, i, 1, amount);
+      text(letter, x + dx, y + dy);
+      x += textWidth(letter);
+    }
+    popStyle();
+  }
+
+  void drawWideDashLine(String line, float centerX, float y, float beatPos) {
+    float dashScale = lerp(1, 2.5, constrain(beatPos - 180, 0, 1));
+    pushStyle();
+    textAlign(LEFT, CENTER);
+    float totalWidth = 0;
+    for (int i = 0; i < line.length(); i++) {
+      String letter = line.substring(i, i + 1);
+      float scaleX = letter.equals("ー") ? dashScale : 1;
+      totalWidth += textWidth(letter) * scaleX;
+    }
+
+    float x = centerX - totalWidth / 2;
+    for (int i = 0; i < line.length(); i++) {
+      String letter = line.substring(i, i + 1);
+      float letterWidth = textWidth(letter);
+      if (letter.equals("ー")) {
+        pushMatrix();
+        translate(x, y);
+        scale(dashScale, 1);
+        text(letter, 0, 0);
+        popMatrix();
+      } else {
+        text(letter, x, y);
+      }
+      x += letterWidth * (letter.equals("ー") ? dashScale : 1);
+    }
+    popStyle();
+  }
+
+  float randomLetterOffset(int step, int letterIndex, int axis, float amount) {
+    int hash = step * 73856093 ^ letterIndex * 19349663 ^ axis * 83492791;
+    hash = (hash ^ (hash >>> 13)) * 1274126177;
+    hash ^= hash >>> 16;
+    float value = (hash & 0x7fffffff) / 2147483647.0;
+    return (value * 2 - 1) * amount;
   }
 }
 

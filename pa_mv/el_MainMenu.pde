@@ -9,7 +9,7 @@
 //    kanan bawah : GRAFIKA KOMPUTER
 //
 //  Pemakaian di pa_mv.pde:
-//    menu = new ElMainMenu(fontJepang, VOLUME);
+//    menu = new ElMainMenu(createFont("NotoSansJP-Regular.ttf", 32), VOLUME);
 //    menu.show();                 // di draw()
 //    menu.selesai                 // true setelah fade-out PLAY selesai
 //    void mousePressed()  { if (!menu.selesai) { menu.mousePressed(); return; } }

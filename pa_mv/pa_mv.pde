@@ -12,7 +12,7 @@ float OFFSET_SEC = 0.0;      // intro diam (detik) sebelum beat 0, kalau ada
 
 ElMainMenu menu;             // menu utama
 SoundFile lagu;              // file lagu
-PFont fontJepang;            // font Jepang (NotoSansJP)
+PFont fontJepang;            // font Jepang (AozoraMinchoMedium)
 BeatClock clock;             // jam beat (sinkron ke lagu)
 PImage pose0;                // gambar pose untuk adegan beat 24-40
 
@@ -47,10 +47,10 @@ void setup() {
   surface.setLocation(100, 50);
   pixelDensity(displayDensity());
 
-  fontJepang = createFont("NotoSansJP-Regular.ttf", 32);
+  fontJepang = createFont("AozoraMinchoMedium.ttf", 32);
   pose0 = loadImage("assets/pose0.png");
   lagu = new SoundFile(this, "assets/MainSong.mp3");
-  menu = new ElMainMenu(fontJepang, VOLUME);
+  menu = new ElMainMenu(createFont("NotoSansJP-Regular.ttf", 32), VOLUME);
 
   clock = new BeatClock();
 

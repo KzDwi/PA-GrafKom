@@ -375,12 +375,17 @@ class ElLorongCahaya {
       float an = e * 0.5 * ((ki % 2 == 0) ? 1 : -1);
       float sc = 1 + 0.25 * e;
       float al = 110 + 145 * p;
+      color lyricColor = color(255);
+      if (s.equals("抗う意味など") && ki < 2) {
+        float redProgress = constrain(t.beatPos - 225, 0, 1);
+        lyricColor = lerpColor(lyricColor, color(255, 0, 0), redProgress);
+      }
 
       pushMatrix();
       translate(x, y + yo);
       rotate(an);
       scale(sc);
-      fill(255, al);
+      fill(lyricColor, al);
       text(c, 0, 0);
       text(c, 0.9, 0);      // tebalkan sedikit
       popMatrix();
