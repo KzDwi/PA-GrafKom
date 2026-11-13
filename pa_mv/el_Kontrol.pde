@@ -13,7 +13,7 @@ class ElKontrol {
   BeatClock clock;
   GUIButton btnPlayPause, btnRestart, btnCheckpoint;
   boolean isPlaying = true;
-  float checkpointSec = 0;   // posisi (detik) yang dipakai tombol RESTART. 0 = awal lagu
+  float checkpointSec = 37;   // posisi (detik) yang dipakai tombol RESTART. 0 = awal lagu
   int lastClickMs = -1000;   // anti spam klik (debounce)
 
   ElKontrol(SoundFile lagu, BeatClock clock) {

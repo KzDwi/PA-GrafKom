@@ -7,6 +7,7 @@ class ElVoidFall {
   int currentScene = -1;
   float sceneStartBeat = 0;
   PImage noiseTex;
+  PImage pose2;
   
   float boxW = 400; float boxH = 150; float boxD = 400; 
 
@@ -16,6 +17,7 @@ class ElVoidFall {
   RoomSegment3D[] roomSegments = new RoomSegment3D[4];
 
   ElVoidFall() {
+    pose2 = loadImage("assets/pose2.png");
     createTexture();
     for (int i = 0; i < 50; i++) voidParticles.add(new VoidParticle2D());
     for (int i = 0; i < 30; i++) stars.add(new BlinkingStar2D());
@@ -138,6 +140,14 @@ class ElVoidFall {
     for (VoidParticle2D vp : voidParticles) {
       vp.update(particleSpeed);
       vp.display();
+    }
+
+    if (currentScene == 1 && pose2 != null) {
+      float poseWidth = pose2.width * 2;
+      float poseHeight = pose2.height * 2;
+      tint(15, 15, 15, 0.45 * 255);
+      image(pose2, width - poseWidth * 0.65, height * 0.5 - poseHeight * 0.5, poseWidth, poseHeight);
+      noTint();
     }
     
     hint(ENABLE_DEPTH_TEST);

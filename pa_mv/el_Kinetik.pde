@@ -8,9 +8,8 @@
 //    - beat 117.5: kolom emas selebar 1/4 layar muncul, 1 anak besar berjalan di dalamnya,
 //      kolom LONCAT 1 slot ke kanan tiap beat (0,1,2,3,0,...), klon tetap berjalan di sekitarnya
 //
-//  GAMBAR (opsional, taruh di folder  data/  ; .png / .jpg / .jpeg boleh):
-//    data/img_walk.png    sprite anak berjalan, MENGHADAP KANAN, latar transparan (png)
-//    data/img_walk2.png   (opsional) frame langkah ke-2 -> dipakai bergantian dengan img_walk
+//  GAMBAR (opsional, taruh di folder assets/):
+//    pose1.png - pose4.png   fase awal berganti tiap 4 beat; mulai beat 121 disorot bergiliran
 //    data/img_spiral.png  (opsional) menggantikan spiral buatan di pita tengah
 //  Kalau belum ada, dipakai anak buatan (siluet vektor) + spiral buatan.
 //
@@ -28,7 +27,8 @@ class ImageSlot {
     String base = file.substring(0, file.lastIndexOf('.'));
     String[] ext = { ".png", ".jpg", ".jpeg", ".PNG", ".JPG", ".JPEG" };
     for (int i = 0; i < ext.length && img == null; i++) {
-      if (new File(dataPath(base + ext[i])).exists()) img = loadImage(base + ext[i]);
+      String path = sketchPath(base + ext[i]);
+      if (new File(path).exists()) img = loadImage(path);
     }
   }
   boolean ada() { return img != null; }
@@ -36,16 +36,16 @@ class ImageSlot {
 
 class ElKinetik {
   PFont font;
-  boolean tampilKana = false;       // true = huruf lirik raksasa di atas spiral (sekarang dimatikan: spiral murni)
+  boolean tampilKana = true;       // true = huruf lirik raksasa di atas spiral (sekarang dimatikan: spiral murni)
   int   ofs = 0;                    // geseran beat (0 = adegan asli 103-136; 128 = pengulangan 231-264)
-  boolean tampilKarakter = false;   // true kalau udh ada gambar
-  float skalaGambar = 0.6;   // 1.0 = ukuran asli, 0.5 = setengah, 0.3 = sepertiga
-  ImageSlot sprite1, sprite2, imgSpiral;
+  boolean tampilKarakter = true;    // gunakan gambar pose bila tersedia
+  float skalaGambar = 0.9;   // 1.0 = ukuran asli, 0.5 = setengah, 0.3 = sepertiga
+  ImageSlot sprite1, sprite2, sprite3, sprite4, imgSpiral;
 
   // ---- jadwal (beat) ----
-  final float CLONE_START  = 103;     // klon pertama muncul
-  final float COLUMN_START = 120;   // kolom emas mulai muncul
-  final int   MAX_CLONES   = 15;
+  final float CLONE_START  = 104;     // klon pertama muncul
+  final float COLUMN_START = 120;   // kolom emas mulai menyorot pose bergiliran
+  final int   MAX_CLONES   = 16;
 
   // ---- warna (diambil dari video referensi) ----
   color barC   = color(136, 128, 105);   // abu-abu letterbox
@@ -68,8 +68,10 @@ class ElKinetik {
 
   ElKinetik(PFont font) {
     this.font = font;
-    sprite1   = new ImageSlot("img_walk.png",   "anak berjalan, menghadap kiri");
-    sprite2   = new ImageSlot("img_walk2.png",  "frame langkah ke-2 (opsional)");
+    sprite1   = new ImageSlot("assets/pose1.png",   "anak berjalan, menghadap kiri");
+    sprite2   = new ImageSlot("assets/pose2.png",  "frame langkah ke-2");
+    sprite3   = new ImageSlot("assets/pose3.png",   "anak berjalan, menghadap kiri");
+    sprite4   = new ImageSlot("assets/pose4.png",  "frame langkah ke-2");
     imgSpiral = new ImageSlot("img_spiral.png", "latar spiral (opsional)");
   }
 
@@ -116,13 +118,13 @@ class ElKinetik {
 
     // ---- klon anak berjalan (1 per beat) ----
     int count = constrain((int) floor(b - CLONE_START) + 1, 0, MAX_CLONES);
-    float spacing = W / 13.0;
+    float spacing = W / 16.0;
     for (int i = 0; i < count; i++) {
-      float sc  = lerp(0.92, 1.14, i / (float) (MAX_CLONES - 1));
       float x   = 48 + i * spacing;
-      float pop = (i == count - 1 && b < CLONE_START + MAX_CLONES) ? punch * 0.12 : 0;
-      float sl  = (i == count - 1) ? -punch * 26 : 0;          // klon baru "masuk" dari kiri
-      kid(x + sl, H * 0.885, H * 0.74 * sc * (1 + pop), b * PI + i * 0.9);
+      boolean entering = i == count - 1 && count < MAX_CLONES;
+      float pop = entering ? punch * 0.12 : 0;
+      float sl  = entering ? -punch * 26 : 0;
+      kid(x + sl, H * 0.885, H * 0.74 * 1.14 * (1 + pop), b * PI + i * 0.9, clonePoseIndex(i));
     }
 
     // ---- redup bertahap: latar digelapkan, kolom & karakter TIDAK ikut ----
@@ -149,7 +151,7 @@ class ElKinetik {
       float cw = W / 4.0, x0 = slot * cw;
       fill(colNow);
       rect(x0, 0, cw, H);
-      kid(x0 + cw * 0.5, H * 0.89, H * 0.80 * (1 + punch * 0.03), b * PI);
+      kid(x0 + cw * 0.5, H * 0.89, H * 0.80 * (1 + punch * 0.03), b * PI, highlightedPoseIndex(b));
       if (t.frac < 0.12 && L < 2.5) {                                       // kilat tipis saat loncat
         fill(255, 240, 200, 70 * (1 - t.frac / 0.12));
         rect(x0, 0, cw, H);
@@ -157,6 +159,16 @@ class ElKinetik {
     }
 
     hint(ENABLE_DEPTH_TEST);
+  }
+
+  int clonePoseIndex(int cloneIndex) {
+    return cloneIndex / 4;
+  }
+
+  int highlightedPoseIndex(float b) {
+    int step = (int) floor(b - COLUMN_START);
+    int cloneIndex = (step % 4) * 4 + step / 4;
+    return cloneIndex / 4;
   }
 
   // ---------------------------------------------------------------
@@ -217,10 +229,14 @@ class ElKinetik {
   //  Satu anak berjalan menghadap kanan. cx = tengah badan, footY = tapak kaki,
   //  h = tinggi total (px), ph = fase langkah (radian)
   // ---------------------------------------------------------------
-  void kid(float cx, float footY, float h, float ph) {
+  void kid(float cx, float footY, float h, float ph, int pose) {
     if (!tampilKarakter) return;
-    if (sprite1.ada()) {
-      PImage im = (sprite2.ada() && sin(ph) > 0) ? sprite2.img : sprite1.img;
+    PImage im = pose == 0 ? sprite1.img
+               : pose == 1 ? sprite2.img
+               : pose == 2 ? sprite3.img
+               : pose == 3 ? sprite4.img
+               : null;
+    if (im != null) {
       float hh = h * skalaGambar;                  // tinggi setelah dikecilkan
       float s  = hh / im.height;
       image(im, cx - im.width * s / 2, footY - hh, im.width * s, hh);
@@ -231,41 +247,41 @@ class ElKinetik {
     translate(cx, footY - abs(sin(ph)) * 1.6 * u);
     strokeJoin(ROUND);
 
-    // kaki (2): paha + betis, outline hitam lalu kulit
-    float hipY = -40 * u;
-    for (int leg = 0; leg < 2; leg++) {
-      float p  = ph + leg * PI;
-      float a1 = sin(p) * 0.55;
-      float kx = 20 * u * sin(a1),  ky = hipY + 20 * u * cos(a1);
-      float a2 = a1 - max(0, cos(p)) * 0.9;
-      float ax = kx + 20 * u * sin(a2), ay = ky + 20 * u * cos(a2);
-      stroke(lineC); strokeWeight(7.5 * u);
-      line(0, hipY, kx, ky); line(kx, ky, ax, ay);
-      stroke(skinC); strokeWeight(5 * u);
-      line(0, hipY, kx, ky); line(kx, ky, ax, ay);
-      stroke(lineC); strokeWeight(1.2 * u); fill(skinC);
-      ellipse(ax + 3 * u, ay, 11 * u, 4.5 * u);                  // telapak kaki
-    }
-    // celana pendek
-    noStroke(); fill(lineC);
-    rect(-13 * u, -46 * u, 26 * u, 8 * u);
-    // hoodie besar
-    stroke(lineC); strokeWeight(1.6 * u); fill(hoodC);
-    ellipse(-2 * u, -62 * u, 46 * u, 50 * u);
-    ellipse(13 * u, -54 * u, 26 * u, 13 * u);                    // lengan menjulur ke depan
-    ellipse(6 * u, -76 * u, 17 * u, 12 * u);                     // kerah tinggi
-    // kepala
-    noStroke(); fill(hairC);
-    ellipse(2 * u, -86 * u, 36 * u, 34 * u);
-    triangle(-16 * u, -84 * u, -27 * u, -68 * u, -9 * u, -74 * u);   // rambut belakang
-    fill(skinC);
-    ellipse(12 * u, -83 * u, 15 * u, 13 * u);
-    fill(120, 115, 85);
-    ellipse(15 * u, -84 * u, 5 * u, 5 * u);                      // mata
-    fill(hairC);
-    ellipse(8 * u, -92 * u, 28 * u, 12 * u);                     // poni
-    popMatrix();
-    noStroke();
-    strokeWeight(1);
+    // // kaki (2): paha + betis, outline hitam lalu kulit
+    // float hipY = -40 * u;
+    // for (int leg = 0; leg < 2; leg++) {
+    //   float p  = ph + leg * PI;
+    //   float a1 = sin(p) * 0.55;
+    //   float kx = 20 * u * sin(a1),  ky = hipY + 20 * u * cos(a1);
+    //   float a2 = a1 - max(0, cos(p)) * 0.9;
+    //   float ax = kx + 20 * u * sin(a2), ay = ky + 20 * u * cos(a2);
+    //   stroke(lineC); strokeWeight(7.5 * u);
+    //   line(0, hipY, kx, ky); line(kx, ky, ax, ay);
+    //   stroke(skinC); strokeWeight(5 * u);
+    //   line(0, hipY, kx, ky); line(kx, ky, ax, ay);
+    //   stroke(lineC); strokeWeight(1.2 * u); fill(skinC);
+    //   ellipse(ax + 3 * u, ay, 11 * u, 4.5 * u);                  // telapak kaki
+    // }
+    // // celana pendek
+    // noStroke(); fill(lineC);
+    // rect(-13 * u, -46 * u, 26 * u, 8 * u);
+    // // hoodie besar
+    // stroke(lineC); strokeWeight(1.6 * u); fill(hoodC);
+    // ellipse(-2 * u, -62 * u, 46 * u, 50 * u);
+    // ellipse(13 * u, -54 * u, 26 * u, 13 * u);                    // lengan menjulur ke depan
+    // ellipse(6 * u, -76 * u, 17 * u, 12 * u);                     // kerah tinggi
+    // // kepala
+    // noStroke(); fill(hairC);
+    // ellipse(2 * u, -86 * u, 36 * u, 34 * u);
+    // triangle(-16 * u, -84 * u, -27 * u, -68 * u, -9 * u, -74 * u);   // rambut belakang
+    // fill(skinC);
+    // ellipse(12 * u, -83 * u, 15 * u, 13 * u);
+    // fill(120, 115, 85);
+    // ellipse(15 * u, -84 * u, 5 * u, 5 * u);                      // mata
+    // fill(hairC);
+    // ellipse(8 * u, -92 * u, 28 * u, 12 * u);                     // poni
+    // popMatrix();
+    // noStroke();
+    // strokeWeight(1);
   }
 }

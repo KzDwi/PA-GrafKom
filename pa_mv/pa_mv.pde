@@ -9,12 +9,12 @@ final float VOLUME = 0.1;   // volume lagu (dipakai juga saat play/restart)
 SoundFile lagu;
 PFont fontJepang;
 BeatClock clock;
+PImage pose0;
 
 // ---- daftar element ----
 ElBackrooms  backrooms;
 ElBackroomStatic backroomStatic;
 ElBola       bola;
-ElPolyrhythm poli;
 ElJudul      judul;
 ElLirik      lirik;
 ElDebug      debug;
@@ -42,6 +42,7 @@ void setup() {
   pixelDensity(displayDensity());
 
   fontJepang = createFont("NotoSansJP-Regular.ttf", 32);
+  pose0 = loadImage("assets/pose0.png");
   lagu = new SoundFile(this, "assets/MainSong.mp3");
   lagu.play();
   lagu.amp(VOLUME); // buat test aja
@@ -51,7 +52,6 @@ void setup() {
   backrooms = new ElBackrooms();
   backroomStatic = new ElBackroomStatic();
   bola      = new ElBola(100);
-  poli      = new ElPolyrhythm(200, 60);
   judul     = new ElJudul(fontJepang, "LOOPING THE ROOM");
   lirik     = new ElLirik(fontJepang);
   debug     = new ElDebug(fontJepang);
@@ -110,8 +110,12 @@ void draw() {
   // Urutan panggil = urutan tumpukan (yang terakhir paling depan)
   if (clock.inBeat(312, 328)) kolomNeg.show(clock, 312, 328);   // kartu emas transparan loncat per beat (ruangan tetap ganti tiap beat) (di atas latar 3D, di bawah teks)
 
-  if (!clock.inBeat(100, 136) && clock.beat < 168) bola.show(clock); // bola disembunyikan di adegan pintu & kinetik
-  if (clock.inBeat(0, 200)) poli.show(clock);      // beat 0-199
+  if (!clock.inBeat(100, 136) && clock.beat < 168) bola.show(clock); // bola disembunyikan di adegan pintu & kinetik     // beat 0-199
+  if (clock.inBeat(24, 40)) {
+    float poseWidth = pose0.width * 0.3;
+    float poseHeight = pose0.height * 0.3;
+    image(pose0, width / 2.0 - poseWidth / 2, height * 0.72 - poseHeight / 2, poseWidth, poseHeight);
+  }
   
   //40,47
   if (clock.inBeat(40, 49)) {

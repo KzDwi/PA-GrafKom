@@ -19,8 +19,8 @@ Kalau kamu AI atau developer yang melanjutkan pekerjaan ini:
 (English summary for AI) Modular Processing P3D music-visual project, beat-synced
 via a BeatClock. Elements = classes El*, scheduled in draw() of pa_mv.pde. 3D elements
 render through Canvas3D (offscreen PGraphics) to avoid depth conflicts with 2D.
-The code was written WITHOUT being compiled/run (no Processing in the authoring
-environment) - expect to fix small compile/runtime errors first.
+The latest code changes have NOT been compiled/run in Processing; expect to fix
+compile/runtime errors when validating the sketch.
 
 =====================================================================
  1. KONTEKS PROYEK
@@ -164,6 +164,19 @@ environment) - expect to fix small compile/runtime errors first.
           Konstanta OFF_MULAI / OFF_DUR di el_RuangTV.pde. Setelah 357 ElRuangTV tidak menggambar apa-apa.
           BELUM dijalankan di Processing.
 
+[Tahap 18 - 13 November 2026] Asset pose pada adegan awal dan revisi animasi clone kinetik.
+          -> pa_mv.pde: assets/pose0.png ditampilkan di beat 24-39, skala 30% dari ukuran asli,
+             posisi horizontal tengah dan sekitar 72% tinggi kanvas.
+          -> el_Kinetik.pde: assets/pose1.png sampai pose4.png dipakai untuk 16 clone.
+             Clone 1-4 memakai pose1, 5-8 pose2, 9-12 pose3, dan 13-16 pose4.
+             Clone memiliki tinggi seragam setara ukuran terbesar sebelumnya (faktor 1.14),
+             jumlah dibatasi 16 dan animasi masuk berhenti setelah clone terakhir muncul.
+          -> Jadwal highlight mulai beat 120 mengikuti urutan clone 1, 5, 9, 13,
+             2, 6, 10, 14, dan seterusnya. Batas beat 136 tetap eksklusif sesuai pilihan
+             pemilik, sehingga pose4 clone ke-16 tidak tampil sebelum adegan berakhir.
+          -> Asset pose0.png-pose4.png tersedia di assets/. BELUM dikompilasi atau
+             dijalankan di Processing.
+
 =====================================================================
  3. STATUS SAAT INI
 =====================================================================
@@ -174,12 +187,14 @@ SUDAH DIBUAT (kode ada, struktur final):
   [x] ElBackrooms  (3D, 3 palette: kuning / abu-abu / ungu)
   [x] ElBackroomStatic (3D, 4 ruangan kamera diam; menggantikan ElTunnel yang dihapus)
   [x] ElBola, ElPolyrhythm, ElJudul, ElLirik, ElDebug, ElKontrol (+GUIButton)
+  [x] ElKinetik menggunakan pose1-pose4 untuk 16 clone dengan ukuran seragam dan highlight berurutan
   [x] pa_mv.pde dengan jadwal contoh (lihat README_PROYEK.txt bagian 2)
   [x] Dokumentasi: README_PROYEK.txt, el__TEMPLATE.pde
 
 STATUS PENGUJIAN (JUJUR):
-  [ ] BELUM pernah dikompilasi / dijalankan di Processing (lingkungan penulis tidak
-      punya Processing/javac). Kemungkinan ada error kecil saat run pertama.
+  [ ] Perubahan terbaru BELUM dikompilasi / dijalankan di Processing. Processing
+      tersedia di mesin kerja, tetapi sketch belum dibuka/dijalankan untuk validasi.
+      Kemungkinan ada error kompilasi/runtime yang belum terdeteksi.
   [ ] Perbaikan "3D nembus 2D" lewat Canvas3D BELUM dikonfirmasi berhasil oleh pemilik.
       Penyebabnya adalah dugaan (depth buffer & kamera bersama). Jika masih bermasalah,
       minta screenshot / deskripsi gejala yang tepat sebelum menebak lagi.
