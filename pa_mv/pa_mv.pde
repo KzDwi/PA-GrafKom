@@ -10,6 +10,7 @@ ElMainMenu menu;
 SoundFile lagu;
 PFont fontJepang;
 BeatClock clock;
+PImage pose0;
 
 // ---- daftar element ----
 ElBackrooms  backrooms;
@@ -43,6 +44,7 @@ void setup() {
   pixelDensity(displayDensity());
 
   fontJepang = createFont("NotoSansJP-Regular.ttf", 32);
+  pose0 = loadImage("assets/pose0.png");
   lagu = new SoundFile(this, "assets/MainSong.mp3");
   menu = new ElMainMenu(fontJepang, VOLUME);
   
@@ -118,7 +120,11 @@ void draw() {
 
   // if (!clock.inBeat(100, 136) && clock.beat < 168) bola.show(clock); // bola disembunyikan di adegan pintu & kinetik
   // if (clock.inBeat(0, 200)) poli.show(clock);      // beat 0-199
-  
+  if (clock.inBeat(24, 40)) {
+  float poseWidth = pose0.width * 0.3;
+  float poseHeight = pose0.height * 0.3;
+  image(pose0, width / 2.0 - poseWidth / 2, height * 0.72 - poseHeight / 2, poseWidth, poseHeight);
+}
 
 
   //40,47

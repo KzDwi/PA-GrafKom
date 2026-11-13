@@ -241,6 +241,19 @@ owner HAS run it (Tahap 20) but many edge cases remain untested.
              cek !isPlaying()). Keduanya sudah ditangani.
           -> BELUM dikompilasi oleh penulis; pemilik sudah jalankan dan laporkan "sudah OK".
 
+[Tahap 21] Animasi lima clone pada ElSpiralZoom (T0-T3).
+          -> el_SpiralZoom.pde: lima gambar pose1.png, pose2.png, pose3.png, pose4f.png,
+             pose5.png dimuat dari assets/. pose4f.png menggantikan pose4.png untuk slot ke-4.
+          -> Lima clone berputar satu posisi setiap beat dan bergerak cepat ke kiri selama
+             0.3 beat; clone yang keluar muncul kembali dari kanan.
+          -> Baris aktif di rentang T0-T1, T1-T2, dan T2-T3; urutan rotasi dimulai ulang
+             saat memasuki setiap rentang.
+          -> Posisi vertikal centerY saat ini: T0=0, T1=0.85, T2=0.5. Tinggi gambar:
+             T0/T1=1.5 kali tinggi kanvas, T2=0.8 kali tinggi kanvas. T2 memakai jarak
+             posisi merata sepanjang lebar kanvas serta penyesuaian ukuran berdasarkan
+             lebar jarak clone; hasil visual/ada tidaknya tumpang tindih BELUM diverifikasi.
+          -> BELUM dikompilasi atau dijalankan di Processing.
+
 =====================================================================
  3. STATUS SAAT INI
 =====================================================================
@@ -253,6 +266,7 @@ SUDAH DIBUAT (kode ada, struktur final):
   [x] ElBackroomStatic (3D, 4 ruangan kamera diam + detail baru)
   [x] ElBola, ElPolyrhythm, ElJudul, ElLirik, ElDebug, ElKontrol (+GUIButton,
       termasuk kembaliKeMenu)
+  [x] ElSpiralZoom dengan lima clone berotasi per beat pada segmen T0-T3
   [x] pa_mv.pde dengan menu gate + jadwal beat + mulaiLagu + ESC ke menu
   [x] Dokumentasi: README_PROYEK.txt, el__TEMPLATE.pde
 

@@ -7,6 +7,8 @@
 //    280 -> 290 : kembali ke posisi semula (spiral full, tanpa zoom)
 //  Tiap segmen kamera diam di posisinya (merayap pelan hanya kalau DRIFT diisi > 0).
 //  Spiral terus berputar (fasenya melanjutkan adegan kinetik: beat - 128).
+//  Tiap segmen T0-T1, T1-T2, dan T2-T3 menampilkan lima clone bergeser tiap beat.
+//  Posisi tengah baris: CLONE_END_Y, 85%, lalu 40%; ukuran baris T2 = 1.3x.
 //
 //  spiralZoom = new ElSpiralZoom();               // setup()
 //  spiralZoom.show(clock, kinetik);               // draw()  (beat 264-289)
@@ -21,6 +23,21 @@ class ElSpiralZoom {
   final float ZB  = 2.2,  FBX =  0.06, FBY = -0.24;   // zoom 2: atas, condong kanan
   final float DRIFT = 0;                              // dorongan zoom pelan selama tiap segmen (0 = kamera diam)
   final float GESER = 128;                            // fase spiral = beat - 128 (sama dgn kinetik ke-2)
+  final int MAX_CLONES = 5;
+  final float CLONE_END_Y = 0;
+  final float CLONE_T1_CENTER_Y = 0.85;
+  final float CLONE_T2_CENTER_Y = 0.5;
+  final float CLONE_HEIGHT = 1.5;
+  final float CLONE_T2_HEIGHT = 0.8;
+  final float CLONE_SLIDE_BEATS = 0.3;
+  PImage[] clonePoses = new PImage[MAX_CLONES];
+
+  ElSpiralZoom() {
+    for (int i = 0; i < MAX_CLONES; i++) {
+      String poseFile = i == 3 ? "assets/pose4f.png" : "assets/pose" + (i + 1) + ".png";
+      clonePoses[i] = loadImage(poseFile);
+    }
+  }
 
   void show(BeatClock t, ElKinetik kin) {
     float b = t.beatPos;
@@ -65,6 +82,41 @@ class ElSpiralZoom {
       kin.spiral(cx, cy, bs, punch);
     }
     popMatrix();
+
+    if (b >= T0 && b < T3) {
+      float phaseStart = b >= T2 ? T2 : (b >= T1 ? T1 : T0);
+      float centerY = b >= T2 ? CLONE_T2_CENTER_Y
+                    : (b >= T1 ? CLONE_T1_CENTER_Y : CLONE_END_Y);
+      float cloneHeight = b >= T2 ? CLONE_T2_HEIGHT : CLONE_HEIGHT;
+      float elapsed = b - phaseStart;
+      int beatStep = (int) floor(elapsed);
+      float beatProgress = elapsed - beatStep;
+      float slide = sst(0, CLONE_SLIDE_BEATS, beatProgress);
+      float spacing = b >= T2 ? W / MAX_CLONES : W / (MAX_CLONES - 2.5);
+      float firstX = b >= T2 ? spacing * 0.5 : W * 0.5 - (MAX_CLONES - 1) * spacing * 0.5;
+      imageMode(CENTER);
+      for (int i = 0; i < MAX_CLONES; i++) {
+        int poseIndex = (i + beatStep) % MAX_CLONES;
+        PImage pose = clonePoses[poseIndex];
+        if (pose != null) {
+          float poseHeight = H * cloneHeight;
+          float poseWidth = pose.width * poseHeight / pose.height;
+          if (b >= T2 && poseWidth > spacing * 0.9) {
+            float fitScale = spacing * 1.8 / poseWidth;
+            poseWidth *= fitScale;
+            poseHeight *= fitScale;
+          }
+          float x = firstX + i * spacing - slide * spacing;
+          float y = H * centerY;
+          image(pose, x, y, poseWidth, poseHeight);
+          if (i == 0) {
+            image(pose, firstX + (MAX_CLONES - 1) * spacing + spacing * (1 - slide),
+                  y, poseWidth, poseHeight);
+          }
+        }
+      }
+      imageMode(CORNER);
+    }
 
     hint(ENABLE_DEPTH_TEST);
   }
