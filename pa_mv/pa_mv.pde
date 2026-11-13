@@ -5,7 +5,7 @@
 // =====================================================================
 import processing.sound.*;
 
-float VOLUME = 0.01;         // volume lagu (dipakai juga saat play/restart)
+float VOLUME = 0.2;         // volume lagu (dipakai juga saat play/restart)
 int START_BEAT = 0;          // beat awal saat lagu mulai
 float BPM = 162;             // BPM lagu
 float OFFSET_SEC = 0.0;      // intro diam (detik) sebelum beat 0, kalau ada
@@ -137,6 +137,7 @@ void draw() {
   // Beat 100-136: kinetik + VHS
   if (clock.inBeat(100, 136)) efekVHS.show(clock);
   if (clock.inBeat(103, 136)) kinetik.show(clock, lirik);
+  if (clock.inBeat(152, 168)) kinetik.showKolom(clock, 32);
 
   // Beat 168-194: void fall
   if (clock.inBeat(168, 194)) voidFall.show2D(clock);
