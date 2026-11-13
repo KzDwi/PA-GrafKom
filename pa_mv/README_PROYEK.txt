@@ -12,58 +12,83 @@
 - Arsitektur      : modular. Setiap hal yang tampil = satu "ELEMENT" (class berawalan El)
                     dengan satu method utama show(...). File utama (pa_mv.pde) hanya
                     memutuskan KAPAN (beat berapa) tiap element dipanggil.
+- Menu            : ada menu awal (ElMainMenu) sebelum lagu diputar. Menu punya
+                    latar Backrooms 3D sendiri + UI terminal + slider volume.
 - Satu jam beat   : objek BeatClock di-update 1x per frame, lalu dikirim ke semua element.
 - Dua jenis element:
     * 3D (latar)  -> dirender ke kanvas offscreen (Canvas3D) lalu ditempel sebagai gambar.
     * 2D (overlay)-> digambar langsung ke layar, depth test dimatikan.
 - Batasan Processing: semua file .pde HARUS ada di folder sketch utama (sub-folder
   tidak dikompilasi). Karena itu pengelompokan memakai awalan nama file:
-    core_*.pde = inti/sistem,  el_*.pde = element visual.
+    core_*.pde = inti/sistem,  el_*.pde = element visual, fx_*.pde = efek.
 - Nama folder sketch harus sama dengan nama file main (folder pa_mv/ -> pa_mv.pde).
 
 ---------------------------------------------------------------------
  1. STRUKTUR FILE
 ---------------------------------------------------------------------
 pa_mv/
-  pa_mv.pde             MAIN: setup element + JADWAL pemanggilan di draw() + mousePressed
+  pa_mv.pde             MAIN: setup element + JADWAL pemanggilan di draw() + menu gate
+                        + mulaiLagu() + input (mouse/key)
   core_BeatClock.pde    class BeatClock   (jam beat)
   core_Canvas3D.pde     class Canvas3D    (kanvas 3D offscreen, mencegah 3D "nembus" 2D)
-  el_Backrooms.pde      class ElBackrooms (3D) lorong Backrooms kamera bergerak
+  el_MainMenu.pde       class ElMainMenu  (menu awal: Backrooms 3D + terminal UI)
+  el_Backrooms.pde      class ElBackrooms (3D) lorong Backrooms kamera bergerak (HD)
                         + class ElBackroomStatic (3D) 4 ruangan kamera DIAM
-                        (el_Backrooms.pde juga memuat class ElBackroomStatic: 4 ruangan kamera diam)
   el_Bola.pde           class ElBola      (2D) bentuk di tengah layar, berdenyut tiap beat
   el_Polyrhythm.pde     class ElPolyrhythm(2D) indikator 4 layer ritme, kanan atas
   el_Teks.pde           class ElJudul, ElLirik, ElDebug (2D teks)
-  el_Kontrol.pde        class ElKontrol + GUIButton (2D tombol Play/Pause & Restart)
+  el_Kontrol.pde        class ElKontrol + GUIButton (2D tombol Play/Pause & Restart
+                        & Checkpoint + kembaliKeMenu)
   el__TEMPLATE.pde      kerangka element baru (semua di-comment)
   README_PROYEK.txt     file ini
   data/                 (dibuat manual) NotoSansJP-Regular.ttf, assets/MainSong.mp3
                         -> cek path di setup() jika dipindah
 
+Element lain yang dipakai di jadwal (tidak wajib dibaca untuk mulai, tapi ada):
+  el_TvStatic, el_EfekVHS, el_DoorLoop, el_Kinetik, el_VoidFall, el_LorongCahaya,
+  el_HelpMe, el_SpiralZoom, el_KataAkhir, el_RuangBeat, el_KolomNegatif, el_RuangTV.
+  fx_Transition, fx_Mosaic, fx_Riser (efek).
+
 File lama yang SUDAH TIDAK DIPAKAI dan harus dihapus bila masih ada:
   Background.pde, VisualObject.pde, UI.pde, AudioManager.pde
-  (isinya sudah dipindah ke el_Bola, el_Polyrhythm/el_Kontrol, core_BeatClock;
-   tunnel wireframe lama DIHAPUS, digantikan ElBackroomStatic)
   el_Tunnel.pde juga sudah dihapus - hapus bila masih ada di folder sketchmu.
 
 ---------------------------------------------------------------------
  2. ALUR FRAME (pa_mv.pde -> draw())
 ---------------------------------------------------------------------
+  0. GATE MENU:
+       if (!menu.selesai) {
+         VOLUME = menu.volume;     // slider menu langsung mengubah volume global
+         menu.show();              // gambar latar 3D + UI menu
+         if (menu.selesai) mulaiLagu();
+         return;                   // tidak ada scene game yang jalan selama di menu
+       }
   1. clock.update(lagu.position() * 1000)    // hitung beat dari posisi lagu (ms)
   2. background(0)
   3. LATAR 3D  : tepat satu element 3D digambar (if / else if berdasarkan beat)
-  4. ELEMENT 2D: bola, polyrhythm, judul, lirik  (urutan panggil = urutan tumpukan)
+  4. ELEMENT 2D: kolom negatif, tv static, efek VHS, kinetik, spiral zoom,
+     lorong cahaya, void fall, ruang TV, transition, lirik, mosaic, help me,
+     kata akhir, dsb. (urutan panggil = urutan tumpukan)
   5. UI        : kontrol (tombol), debug (teks beat)
-  6. (opsional) blok switch untuk event sekali jalan
+  6. Event sekali: glitch (per subBeat), switch(clock.beat) untuk flash tertentu
 
 Contoh jadwal yang aktif sekarang (UBAH sesuka hati):
+  beat 100-103         -> ElDoorLoop
+  beat 103-136         -> (kinetik 2D menutupi)
+  beat 8-22, 24-39     -> Backrooms palette 0 (kuning) + backroomStatic (24-39)
   beat 22-23           -> Backrooms palette 1 (abu-abu)
+  beat 136-167         -> Backrooms palette 0 (kuning)
   beat 150-151         -> Backrooms palette 2 (ungu)
-  beat 8-39, 136-167   -> Backrooms palette 0 (kuning)
-  selain itu           -> ElBackroomStatic ruang 0 (default; ganti sesuai keinginan)
-  bola                 -> selalu
-  polyrhythm           -> beat 0-199
-  judul, lirik         -> selalu (lirik punya timing sendiri di el_Teks.pde)
+  beat 168-199         -> voidFall (scene 0-3)
+  beat 200-227.5       -> lorongCahaya 3D + 2D
+  beat 227.5-231       -> helpMe (layar hitam Base64)
+  beat 231-263         -> kinetik ke-2 (geser +128)
+  beat 264-289         -> spiralZoom + efekVHS
+  beat 290-297         -> kataAkhir
+  beat 297-328         -> ruangBeat (1 ruangan per beat) + kolomNeg
+  beat 329-356         -> ruangTV (bingkai blur -> TV hidup)
+  beat 356-357         -> ruangTV.showMati
+  selain itu           -> backroomStatic ruang 0
 
 ATURAN PENTING:
 - Pada rantai if/else-if latar 3D, rentang yang paling SEMPIT taruh paling atas.
@@ -92,6 +117,7 @@ ATURAN PENTING:
     void    reset()                    dipanggil saat restart lagu
     boolean inBeat(int dari, int sampai)  true jika dari <= beat < sampai
     boolean atBeat(int n)              true sekali saat beat n baru mulai
+    boolean atSubBeat(int n)           true sekali saat subBeat ke-n mulai
     float   progress(int dari, int sampai) 0..1 progres di dalam rentang beat
 
 3.2 Canvas3D  (core_Canvas3D.pde)
@@ -102,50 +128,109 @@ ATURAN PENTING:
   Alasan ada: 3D yang digambar langsung ke layar memakai depth buffer, kamera, dan
   lampu yang sama dengan 2D, sehingga dinding 3D bisa menutupi/menembus element 2D.
   Dengan kanvas offscreen, 3D hanya "gambar latar" biasa.
+  ⚠ Setiap Canvas3D = 1 framebuffer GPU. Punya banyak Canvas3D (ElBackrooms,
+  ElBackroomStatic, ElDoorLoop, ElVoidFall, ElLorongCahaya, ElRuangBeat, ElRuangTV,
+  ElMainMenu) = banyak VRAM terpakai. Ini penyebab OOM yang pernah terjadi.
 
-3.3 ElBackrooms (3D)   new ElBackrooms();   show(BeatClock t, int palette)
+3.3 ElMainMenu (2D + 3D)   new ElMainMenu(PFont f, float volAwal)
+    show()          gambar latar 3D Backrooms + UI terminal + fade in/out.
+                    Kalau fade-out selesai, selesai=true (dibaca draw() utama).
+    mousePressed()  klik tombol PLAY atau mulai drag slider volume.
+    mouseDragged()  geser slider (kalau dragging).
+    mouseReleased() lepas drag.
+    tekanPlay()     paksa mulai fade-out (dipakai keyboard ENTER/SPASI).
+    reset()         kembalikan state menu ke awal (selesai=false, memudar=false,
+                    tMulai=now) supaya bisa dipanggil lagi setelah ESC.
+    Field:
+      float   volume    volume yang dipilih user (dibaca pa_mv.pde -> VOLUME global).
+      boolean selesai   true setelah fade-out PLAY selesai. draw() utama pakai ini.
+  Cara pakai: setelah selesai=false, draw() panggil menu.show() dan return.
+  Setelah selesai=true, mulaiLagu() dipanggil sekali, lalu scene game jalan.
+
+3.4 ElBackrooms (3D)   new ElBackrooms();   show(BeatClock t, int palette)
     palette: 0 kuning (default), 1 abu-abu, 2 ungu
-    Isi: lantai karpet, plafon kotak + lampu panel zig-zag, dinding luar bergaris
-    wallpaper, partisi acak (kiri / kanan / melintang), debu melayang, kabut jarak.
-    Gerak kamera: maju sesuai beatPos (UNITS_PER_BEAT), goyang kiri-kanan tiap 4 beat,
-    naik-turun tiap beat, hentakan FOV + roll tiap beat.
-    Pengaturan (konstanta di atas class): CELL, HALF, FLOOR, CEIL, VIEW, UNITS_PER_BEAT.
-    Partisi bersifat deterministik (hash dari nomor segmen) -> sama setiap kali diputar.
+    Isi: lorong Backrooms kamera maju terus (UNITS_PER_BEAT=300 per beat).
+    Pencahayaan HD per-vertex (lit()):
+      - Setiap lampu panel jadi lampu titik (kolam cahaya di lantai, gradasi dinding).
+      - Ambient + diffuse wrap-lighting + spekular Blinn-Phong (khusus lantai glossy).
+      - AO palsu di sudut dinding/lantai/plafon.
+      - Tone-mapping supaya highlight tidak jebol putih.
+      - Halo additive di sekitar tiap lampu (pass kedua).
+      - 15% lampu rusak berkedip.
+      - Vignette.
+    Detail: sambungan karpet, garis kotak plafon, plint, wainscot, crown, rel
+    dinding, stripes wallpaper, partisi acak deterministik (hash per segmen).
+    Pengaturan (konstanta di atas class):
+      CELL=500, HALF=650, FLOOR=150, CEIL=-170, VIEW=4800, UNITS_PER_BEAT=300,
+      LAMP_I=1.7, LAMP_R=420, LAMP_DROP=20, AMB=0.30, VIG=150.
+    ⚠ Berat! Kalau OOM/lambat, lihat bagian 6 (CATATAN TEKNIS).
 
-3.4 ElBackroomStatic (3D)   new ElBackroomStatic();   show(BeatClock t, int ruang)
-    (class ada di bagian bawah el_Backrooms.pde, menggantikan ElTunnel)
-    4 ruangan dengan KAMERA DIAM, sengaja gelap + vignette, berdasarkan 4 gambar referensi:
-      ruang 0 = Level 0 gelap   (wallpaper kuning-hijau, pilar, 1 lampu panel, pintu gelap)
-      ruang 1 = Lobi terbengkalai (kursi mustard, sofa merah, karpet pink, kolom, puing,
+3.5 ElBackroomStatic (3D)   new ElBackroomStatic();   show(BeatClock t, int ruang)
+    (class ada di bagian bawah el_Backrooms.pde)
+    4 ruangan dengan KAMERA DIAM, sengaja gelap + vignette:
+      ruang 1 = Level 0 gelap   (wallpaper kuning-hijau, pilar, 1 lampu panel, pintu gelap)
+      ruang 2 = Lobi terbengkalai (kursi mustard, sofa merah, karpet pink, kolom, puing,
                                    mural hutan oranye di belakang)
-      ruang 2 = Lorong lengkung hijau (5 portal lengkung berurutan, lantai hijau)
-      ruang 3 = Ruang bermain biru (alcove lengkung dengan balok mainan, jendela bulat
-                                    kuning & pink, karpet pink + lingkaran kuning)
-    Nilai ruang di luar 0..3 di-wrap (mis. 5 -> 1, -1 -> 3).
-    Field opsional:  gelap (kecerahan global, default 0.7)  |  kedip (denyut lampu
-    per beat, default 0 = mati).
-    Cara kerja pencahayaan: lampu titik berwarna, dihitung PER-VERTEX (quad dipecah
-    kecil-kecil) + kabut gelap makin jauh. Benda dibuat dari prism/cyl/ring/disc/archWall.
+      ruang 3 = Lorong lengkung hijau (5 portal lengkung berurutan, lantai hijau,
+                                       sconce/lampu dinding)
+      ruang 4 = Ruang bermain biru (alcove lengkung dengan balok mainan, jendela bulat
+                                    kuning & pink, karpet pink + lingkaran kuning,
+                                    bola mainan)
+    Nilai lain (0, 5, -1, dst) -> roomLevel0DEFAULT() (versi grayscale).
+    Field opsional (public, bisa di-set dari setup()/draw()):
+      float gelap  (default 0.7)  kecerahan global. 0 = hitam, 1 = terang.
+      float kedip  (default 0)    >0 = lampu berdenyut halus tiap beat.
+      int   debu   (default 0)    jumlah partikel debu (0 = mati, hemat GPU).
+    Detail per ruangan: trim (plint+crown), wainscot (panel bawah dinding),
+    ceiling grid, floor tiles, contact shadows (gelap di pertemuan sudut),
+    recessed (lampu bulat), panel (dengan glow), vent, stain (noda lantai),
+    ball (bola mainan), sconce (lampu dinding), archTrim.
     Mengubah isi ruangan = edit method roomLevel0/roomLobi/roomArch/roomPlay.
 
-3.5 ElBola (2D)        new ElBola(float baseSize);   show(BeatClock t)
+3.6 ElBola (2D)        new ElBola(float baseSize);   show(BeatClock t)
     Membesar tiap newBeat lalu mengecil. Bentuk berganti per beat (beat % 4):
     0 lingkaran, 1 persegi, 2 segitiga, 3 belah ketupat. Selalu di tengah layar.
 
-3.6 ElPolyrhythm (2D)  new ElPolyrhythm(float w, float h);   show(BeatClock t)
+3.7 ElPolyrhythm (2D)  new ElPolyrhythm(float w, float h);   show(BeatClock t)
     Kotak di kanan atas: 4 layer (1/1 bola merah, 1/2 kotak cyan, 1/4 garis hijau,
     1/8 partikel magenta) yang berkedip tiap hitungannya.
 
-3.7 ElJudul / ElLirik / ElDebug (2D teks)   (file el_Teks.pde)
+3.8 ElJudul / ElLirik / ElDebug (2D teks)   (file el_Teks.pde)
     new ElJudul(PFont, String isi);  new ElLirik(PFont);  new ElDebug(PFont);
     show(BeatClock t) pada ketiganya.
     Data lirik ada di ElLirik: array lirik[], lirikBeat[] (beat mulai), durasiLirik[]
     (lama tampil dalam beat). Tambah baris lirik = tambah ke ketiga array dengan urutan sama.
 
-3.8 ElKontrol (2D)     new ElKontrol(SoundFile lagu, BeatClock clock)
-    show()              gambar tombol PLAY/PAUSE dan RESTART (kiri atas)
-    mousePressed()      HARUS dipanggil dari void mousePressed() di main
-    Restart: lagu.jump(0) + clock.reset().
+3.9 ElKontrol (2D)     new ElKontrol(SoundFile lagu, BeatClock clock)
+    show()              gambar tombol PLAY/PAUSE, RESTART, CHECKPOINT + teks checkpoint.
+    mousePressed()      HARUS dipanggil dari void mousePressed() di main (saat menu.selesai).
+    setCheckpoint()     simpan posisi lagu SEKARANG sebagai titik RESTART (juga dipanggil
+                        dari keyPressed 'c').
+    restartFromCheckpoint()  stop() + jump(checkpointSec) + setPlaying(true).
+    kembaliKeMenu()     stop() + clock.reset() + transitionFx.reset() + riser.stopNow()
+                        + setPlaying(true). Dipanggil dari keyPressed saat ESC.
+                        ⚠ JANGAN panggil jump(0) di sini — jump() pada stopped SoundFile
+                        malah MEMUTAR lagu.
+    Field:
+      boolean isPlaying   state tombol (true = PAUSE, false = PLAY).
+
+3.10 Element lain (ringkas, tidak wajib untuk mulai)
+    ElTvStatic       show(clock, room)             2D anak TV + tape scroll
+    ElEfekVHS        show(clock)                   overlay grain, scanline, glitch
+    ElDoorLoop       show(clock, beatMulai)        3D pintu loop
+    ElKinetik        show(clock, lirik[, geser])   2D adegan kinetik (bisa digeser
+                                                   untuk pemakaian ulang)
+    ElVoidFall       show3D(clock, scene) + show2D(clock)   perjalanan void
+    ElLorongCahaya   show3D(clock) + show2D(clock, lirik)   lorong dengan cahaya
+    ElHelpMe         show(clock)                   layar hitam + Base64 "Help Me"
+    ElSpiralZoom     show(clock, kinetik)          spiral full layar + zoom kamera
+    ElKataAkhir      show(clock, lirik)            hitam + distorsi + lirik final
+    ElRuangBeat      show(clock, beatMulai, beatKartu, beatAkhir)  16 ruangan beat
+    ElKolomNegatif   show(clock, beatMulai, beatAkhir)  kolom negatif transparan
+    ElRuangTV        show(clock) + showMati(clock, beatMulai, durasi)  bingkai blur -> TV
+    FxTransition     triggerGlitch() / triggerPresser() / trigger() / triggerLight() / reset()
+    FxMosaic         show(clock, outA, outB, inA, inB)  transisi kotak-kotak
+    FxRiser          update(clock, aktif) / stopNow()   suara naik sintesis
 
 ---------------------------------------------------------------------
  4. CARA MENAMBAH ELEMENT BARU
@@ -183,7 +268,7 @@ Untuk element 3D baru, pakai pola Canvas3D (contoh lengkap: ElBackroomStatic di 
   Panggil di bagian LATAR 3D (rantai if/else-if) di draw().
 
 Konvensi:
-- Nama class berawalan "El", nama file berawalan "el_".
+- Nama class berawalan "El", nama file berawalan "el_". Efek pakai "Fx", file "fx_".
 - Satu method utama show(BeatClock t, ...parameter opsional...).
 - State internal (animasi, timer) disimpan sebagai field class, bukan variabel global.
 - Element tidak boleh memutuskan kapan dirinya tampil; itu tugas draw() di main.
@@ -207,22 +292,55 @@ Konvensi:
     }
   atau satu event:  if (clock.atBeat(64)) { ... }
 
+- Event SEKALI di SUB-beat (1 beat = 2 subbeat):  if (clock.atSubBeat(n)) { ... }
+  Dipakai untuk glitch (mis. atSubBeat(142) = beat 71).
+
 ---------------------------------------------------------------------
  6. CATATAN TEKNIS & MASALAH YANG PERNAH MUNCUL
 ---------------------------------------------------------------------
 - "3D nembus 2D": penyebab = depth buffer & kamera dipakai bersama. Solusi yang dipakai:
   Canvas3D (render 3D offscreen). Jika masih ada masalah visual, cek apakah ada
   element 2D yang lupa hint(DISABLE_DEPTH_TEST) atau memanggil kamera/perspective sendiri.
+
 - Window bisa di-resize: element 2D memakai width/height tiap frame; Canvas3D membuat
   ulang kanvas saat ukuran berubah.
-- Performa: Backrooms menggambar ~12 segmen per frame dengan quad + garis. Jika berat,
-  kecilkan VIEW, kurangi jumlah debu (loop i < 6 di cell()), atau turunkan
-  antialias Canvas3D (new Canvas3D(2)).
-- ElBackroomStatic: performa tergantung jumlah quad per ruangan (lantai 14x14, dinding,
-  furnitur). Jika berat: kurangi angka pecahan di shell(), atau new Canvas3D(2).
-  Tampilan dirancang untuk window potret 720x900 (FOV vertikal 62 derajat).
+
+- ⚠ OOM (Out of Memory) di ElBackrooms HD:
+    Gejala: "OpenGL error 1285 at beginDraw(): out of memory",
+            "Native memory allocation (malloc) failed ... Chunk::new",
+            java.lang.OutOfMemoryError.
+    Penyebab: terlalu banyak draw call per frame (lit() per vertex × nu×nv besar ×
+              ~12 segmen × jumlah pass). Juga karena banyak Canvas3D (framebuffer
+              GPU per instance).
+    Fix yang sudah dicoba:
+      - Turunkan nu×nv di quadL (floor 8×4, ceiling 6×3, wall 3×2, block 3×2).
+      - Turunkan seg di lineL (2-3, bukan 4).
+      - Turunkan seg di stripesZ/stripesX ke 1.
+      - prismSub trim: 18 -> 6.
+      - ElBackroomStatic.debu default 0 (bukan 50).
+    Fix yang BELUM dicoba (kalau masih OOM):
+      - Processing Preferences -> Increase maximum available memory -> 2048 MB.
+      - pixelDensity(1) di setup() (turunkan resolusi 4×).
+      - Tambahkan flag `hd` di ElBackrooms: default false (matikan detail berat).
+      - Matikan gloss (gloss = 0): Blinn-Phong per vertex ~ berat.
+
 - Lagu ber-pause: lagu.position() berhenti -> beatPos berhenti -> semua visual diam.
+
 - Font Jepang: createFont("NotoSansJP-Regular.ttf", 32) -> file harus ada di folder data/.
+
+- Menu / ESC:
+    * draw() utama langsung `return` kalau !menu.selesai. Ini sengaja: tidak ada scene
+      game yang di-update, lagu tidak play (kalau di menu karena ESC), clock tidak maju.
+    * ESC di Processing default = quit sketch. Harus `key = 0;` untuk cegah.
+    * kembaliKeMenu() JANGAN panggil lagu.jump(0). jump() pada SoundFile yang
+      stopped akan MEMUTAR lagu dari posisi itu (perilaku library, bukan bug).
+    * mulaiLagu() harus selalu stop() + jump(0) + loop() + amp(VOLUME), TIDAK cek
+      isPlaying(). Kalau cek !isPlaying(), setelah user bolak-balik menu, lagu bisa
+      "lanjut dari posisi sebelumnya" karena saat di menu lagu masih playing dari
+      sisa start sebelumnya.
+
+- Kanvas offscreen menempel lebih lambat di retina: pixelDensity(displayDensity())
+  bisa jadi penyebab utama OOM. Kalau layar HiDPI dan OOM, ganti ke pixelDensity(1).
 
 ---------------------------------------------------------------------
  7. TEMPLATE PROMPT UNTUK AI LAIN
@@ -240,3 +358,11 @@ Tempel bagian 0-5 file ini + lampirkan file .pde terkait, lalu gunakan:
 
 Untuk meminta perubahan jadwal:
   "Atur draw() di pa_mv.pde agar: Backrooms kuning di beat A-B, abu-abu di C-D, ..."
+
+Untuk menambah ruangan di ElBackroomStatic:
+  "Tambahkan method room<Nama>() di ElBackroomStatic (el_Backrooms.pde) dan
+   petakan ke case N di switch(ruang) dalam show(). Gunakan helper yang sudah ada
+   (shell, quadN, prism, cyl, panel, trim, wainscot, dsb)."
+
+Untuk mengubah menu:
+  "Edit el_MainMenu.pde: ubah [posisi UI / warna / teks / lagu-lagu tambahan]."

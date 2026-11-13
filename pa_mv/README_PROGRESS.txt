@@ -19,8 +19,8 @@ Kalau kamu AI atau developer yang melanjutkan pekerjaan ini:
 (English summary for AI) Modular Processing P3D music-visual project, beat-synced
 via a BeatClock. Elements = classes El*, scheduled in draw() of pa_mv.pde. 3D elements
 render through Canvas3D (offscreen PGraphics) to avoid depth conflicts with 2D.
-The code was written WITHOUT being compiled/run (no Processing in the authoring
-environment) - expect to fix small compile/runtime errors first.
+The code was written WITHOUT being compiled/run by the original author. The current
+owner HAS run it (Tahap 20) but many edge cases remain untested.
 
 =====================================================================
  1. KONTEKS PROYEK
@@ -100,8 +100,8 @@ environment) - expect to fix small compile/runtime errors first.
              bandArch/bandPlay/bandHall. Ukuran band tetap (340px), tetap gelap (overlay room 4).
              style 0 = pita kaset (awal), 1 = lorong lengkung hijau (teleport 1), 2 = ruang bermain
              biru (teleport 2), 3 = lorong berpintu kuning (teleport 3, palet = latar el_DoorLoop).
-             Style mengikuti boySub[] lewat boySeg()/tunnelStyle(). Di style 3 scroll melambat &
-             berhenti di boyEndBeat, pintu terakhir berhenti di depan anak (sinkron ke adegan pintu).
+             Style mengikuti boySub[] lewat boySeg()/tunnelStyle(). Di style 3 scroll melambat & berhenti
+             di boyEndBeat, pintu terakhir berhenti di depan anak (sinkron ke adegan pintu).
              Room 3 (beat 56-72) tetap memakai style 0 terang seperti sebelumnya.
           -> BELUM dikompilasi/dijalankan.
 
@@ -164,34 +164,119 @@ environment) - expect to fix small compile/runtime errors first.
           Konstanta OFF_MULAI / OFF_DUR di el_RuangTV.pde. Setelah 357 ElRuangTV tidak menggambar apa-apa.
           BELUM dijalankan di Processing.
 
+[Tahap 18] MAIN MENU (el_MainMenu.pde) - Backrooms 3D + Terminal UI
+          -> Menu baru muncul di awal sebelum lagu diputar, jadi "gerbang" sebelum game.
+          -> Latar 3D: lorong Backrooms kamera maju pelan (camZ = -t*28), parallax mouse halus
+             (mx, my = lerp ke posisi mouse ternormalisasi, faktor 0.035).
+          -> UI terminal kiri atas: judul "LOOPING THE ROOM", status SIGNAL DETECTED (pulse),
+             tombol ENTER THE ROOM, slider AUDIO OUTPUT (drag), footer "ESCAPE IS NOT GUARANTEED".
+          -> Fade-in 1.6 detik saat muncul, fade-out 0.85 detik saat PLAY ditekan.
+          -> menu.selesai = true setelah fade-out; draw() utama memanggil mulaiLagu() sekali.
+          -> Input: klik tombol, drag slider. mousePressed/mouseDragged/mouseReleased diteruskan
+             dari sketch utama (kalau !menu.selesai).
+          -> v3 fix: lightF range 0.72..1.10 dengan smootherstep, detailLampu digambar di 
+             CEIL+1.2 (frame) & CEIL+2.0 (permukaan), garis vertikal wallpaper di-snap ke grid 
+             world 125u (bukan camera-relative), stripWall 6-band dengan pseudo-AO vertikal.
+          -> BELUM dikompilasi oleh penulis; pemilik sudah menjalankan: OK.
+
+[Tahap 19] HD Backrooms (ElBackrooms + ElBackroomStatic) - per-vertex lighting
+          -> ElBackrooms (perubahan besar dari versi awal):
+             * lit(): ambient + 6 lampu terdekat (diffuse dengan wrap lighting + Blinn-Phong
+               spekular untuk lantai) + AO palsu di sudut + tone-map + fog. Setiap vertex
+               dihitung sendiri (bukan 1 warna per quad).
+             * Halo additive di sekitar tiap lampu (pass kedua, setelah benda solid,
+               blendMode ADD, hint DISABLE_DEPTH_MASK).
+             * Lampu rusak berkedip: 15% lampu punya gain 0.2/1.0 bergantung pada
+               sin(beatT * 19) * sin(beatT * 5.3).
+             * Vignette.
+             * Detail: sambungan karpet, garis kotak plafon, plint, wainscot, crown,
+               rel dinding (wallTrim), stripesZ/stripesX dengan lineL (lighting per segmen).
+             * Pantulan glossy di lantai (gloss = 0.55), camera position dihitung untuk
+               vektor view.
+          -> ElBackroomStatic:
+             * Detail baru: trim (plint + crown), wainscot (panel bawah dinding), gridH
+               (ubin plafon + ubin lantai), contactShadows (gradien gelap di pertemuan
+               dinding/lantai/plafon), recessed (lampu plafon bulat), panel (dengan
+               glow), vent (ventilasi), stain (noda lantai), ball (bola mainan +
+               highlight), sconce (lampu dinding di lorong lengkung), archTrim.
+             * Field baru: debu (int, jumlah partikel dust).
+             * addGlow / glows: glow additive di akhir.
+          -> ⚠ BUG: OOM runtime (OpenGL 1285 + Chunk::new malloc failure) karena 
+             draw call meledak (ribuan lit() per frame, ~864.000 alokasi color per 
+             detik, JIT stress).
+
+[Tahap 20] Tuning performa + integrasi menu + ESC ke menu
+          -> OOM fix (belum terbukti hilang total, tergantung hardware):
+             * quadL nu×nv: floor 10×5 -> 8×4, ceiling 10×5 -> 6×3, wall 5×3 -> 3×2,
+               block 5×3 -> 3×2.
+             * lineL seg: 4 -> 3 (floor seam), 4 -> 2 (grid plafon).
+             * stripesZ/stripesX seg: 4 -> 1.
+             * prismSub trim: 18 -> 6.
+             * dust: 6 (di cell) tetap, ElBackroomStatic.debu default 50 -> 0.
+             * halo: mulai dari k0+1 (skip yang di belakang kamera).
+          -> Rekomendasi tuning tambahan (belum diimplementasi): pixelDensity(1),
+             flag `hd` di ElBackrooms untuk matikan detail di scene tertentu, 
+             gloss = 0 kalau masih OOM.
+          -> pa_mv.pde: draw() dibuka dengan cek menu:
+                if (!menu.selesai) {
+                  VOLUME = menu.volume;
+                  menu.show();
+                  if (menu.selesai) mulaiLagu();
+                  return;
+                }
+             mousePressed/Dragged/Released menu-aware.
+             keyPressed: ENTER/RETURN/SPASI pemicu menu.tekanPlay() saat !menu.selesai.
+          -> mulaiLagu(): lagu.stop() + jump(0) + loop() + amp(VOLUME). Tidak ada cek
+             !isPlaying() supaya restart selalu dari awal (mencegah "lanjut dari posisi 
+             sebelumnya" kalau user kembali ke menu setelah main sebentar).
+          -> ESC untuk kembali ke menu (el_Kontrol.kembaliKeMenu):
+             * lagu.stop() — TIDAK jump(0), karena jump() pada SoundFile yang stopped
+               akan MEMUTAR lagu dari posisi itu.
+             * clock.reset(), transitionFx.reset(), riser.stopNow(), setPlaying(true).
+             * menu.reset(): selesai=false, memudar=false, tMulai=now, hPlay=0, hVol=0.
+             * keyPressed: if (key == ESC) { key = 0; if (menu.selesai) { kembaliKeMenu(); 
+               menu.reset(); } }
+          -> Bug fix dari tahap sebelumnya: kembali ke menu malah memutar lagu (karena 
+             jump(0) pada stopped = play), dan masuk lagi malah lanjut (karena mulaiLagu
+             cek !isPlaying()). Keduanya sudah ditangani.
+          -> BELUM dikompilasi oleh penulis; pemilik sudah jalankan dan laporkan "sudah OK".
+
 =====================================================================
  3. STATUS SAAT INI
 =====================================================================
 SUDAH DIBUAT (kode ada, struktur final):
   [x] BeatClock (beat, subBeat, quarter, eighth, beatPos, frac, newBeat, inBeat,
-      atBeat, progress, reset)
+      atBeat, atSubBeat, progress, reset)
   [x] Canvas3D (kanvas 3D offscreen, auto-resize)
-  [x] ElBackrooms  (3D, 3 palette: kuning / abu-abu / ungu)
-  [x] ElBackroomStatic (3D, 4 ruangan kamera diam; menggantikan ElTunnel yang dihapus)
-  [x] ElBola, ElPolyrhythm, ElJudul, ElLirik, ElDebug, ElKontrol (+GUIButton)
-  [x] pa_mv.pde dengan jadwal contoh (lihat README_PROYEK.txt bagian 2)
+  [x] ElMainMenu (menu awal: Backrooms 3D + terminal UI + volume + play)
+  [x] ElBackrooms  (3D, 3 palette: kuning / abu-abu / ungu, lighting per-vertex)
+  [x] ElBackroomStatic (3D, 4 ruangan kamera diam + detail baru)
+  [x] ElBola, ElPolyrhythm, ElJudul, ElLirik, ElDebug, ElKontrol (+GUIButton,
+      termasuk kembaliKeMenu)
+  [x] pa_mv.pde dengan menu gate + jadwal beat + mulaiLagu + ESC ke menu
   [x] Dokumentasi: README_PROYEK.txt, el__TEMPLATE.pde
 
 STATUS PENGUJIAN (JUJUR):
-  [ ] BELUM pernah dikompilasi / dijalankan di Processing (lingkungan penulis tidak
-      punya Processing/javac). Kemungkinan ada error kecil saat run pertama.
-  [ ] Perbaikan "3D nembus 2D" lewat Canvas3D BELUM dikonfirmasi berhasil oleh pemilik.
-      Penyebabnya adalah dugaan (depth buffer & kamera bersama). Jika masih bermasalah,
-      minta screenshot / deskripsi gejala yang tepat sebelum menebak lagi.
-  [ ] Performa belum diukur (Backrooms ~12 segmen/frame, + kanvas offscreen
-      antialias 4x; jika lambat turunkan: new Canvas3D(2), VIEW, jumlah debu).
-  [ ] ElBackroomStatic belum dibandingkan dengan 4 gambar referensi: bentuk perabot,
-      warna, dan tingkat gelap (field gelap) masih perkiraan; pemilik perlu menilai dan
-      meminta penyesuaian per ruangan.
-  [ ] Tampilan Backrooms belum dibandingkan side-by-side dengan video; warna,
-      proporsi lorong, kecepatan maju masih perkiraan dari frame video.
+  [x] Menu muncul, PLAY masuk ke game, ESC kembali ke menu: DIJALANKAN oleh pemilik.
+  [x] Lagu play/restart dari 0 setiap kali masuk game: DIJALANKAN oleh pemilik.
+  [~] ElBackrooms HD: OOM dilaporkan di Tahap 19. Setelah tuning Tahap 20
+      (quadL diturunkan, lineL seg dikurangi) BELUM dikonfirmasi oleh pemilik
+      apakah masih OOM atau tidak.
+  [~] ElMainMenu: setelah v3 fix (lightF, detailLampu, wallpaper world-fixed)
+      dilaporkan OK oleh pemilik.
+  [ ] Performa ElBackrooms HD belum diukur resmi (60 fps? 30 fps? stutter?).
+      Jika masih berat: turunkan lagi nu×nv, matikan gloss, pixelDensity(1),
+      atau tambahkan flag `hd`.
+  [ ] Masalah "3D nembus 2D" lewat Canvas3D BELUM dikonfirmasi ulang oleh pemilik
+      setelah ElBackrooms HD. Jika masih bermasalah, minta screenshot.
+  [ ] ElBackroomStatic belum dibandingkan dengan 4 gambar referensi.
+  [ ] ElMainMenu belum dibandingkan side-by-side dengan referensi visual (video).
   [ ] Perilaku di layar retina / pixelDensity(displayDensity()) untuk kanvas
-      offscreen belum diperiksa (bisa terlihat sedikit lebih buram dari layar utama).
+      offscreen belum diperiksa (bisa terlihat sedikit lebih buram dari layar utama
+      dan bisa jadi penyebab utama OOM di layar HiDPI).
+  [ ] Adegan kinetik, pintu, mosaic, TV, Help Me, kata akhir, ruang beat:
+      dibuat oleh penulis tanpa Processing. Beberapa dilaporkan sudah OK oleh
+      pemilik, sebagian BELUM diverifikasi.
 
 FILE LAMA yang harus sudah dihapus dari folder sketch pemilik (jika belum, class
 akan bentrok): Background.pde, VisualObject.pde, UI.pde, AudioManager.pde, el_Tunnel.pde.
@@ -211,38 +296,54 @@ Konfirmasi pemilik soal ini BELUM ada.
 - Latar 3D: tepat satu aktif per frame (rantai if/else-if); element 2D boleh overlap.
 - Jadwal beat sengaja ada di draw() main, bukan di dalam element (kecuali ElLirik
   yang datanya melekat pada lirik).
-- Jadwal di pa_mv.pde sekarang HANYA CONTOH (Backrooms kuning beat 8-39 & 136-167,
-  abu-abu 22-23, ungu 150-151, selain itu ElBackroomStatic ruang 0). Pemilik akan menyesuaikan sendiri.
+- Menu = state terpisah (menu.selesai). draw() langsung return kalau !menu.selesai,
+  jadi scene game tidak di-update selama di menu (clock tidak jalan, lagu tidak
+  play). Volume slider menu mengubah VOLUME global di setiap frame menu terbuka.
+- Restart / masuk game selalu mulai dari lagu posisi 0 (bukan cek isPlaying()).
+  Ini mencegah bug "lanjut dari posisi sebelumnya" setelah user bolak-balik menu.
+- ESC di Processing default = quit sketch. Harus `key = 0;` untuk cegah, baru
+  tangani sendiri.
 
 =====================================================================
  5. TODO / IDE LANJUTAN (belum dikerjakan, urut kira-kira berdasarkan nilai)
 =====================================================================
 Wajib/awal:
-  [ ] Jalankan di Processing, perbaiki error kompilasi/runtime yang muncul.
-  [ ] Verifikasi masalah "nembus" benar-benar hilang.
+  [ ] Verifikasi apakah OOM setelah Tahap 20 sudah hilang. Kalau belum:
+      * pixelDensity(1) di setup().
+      * Tambahkan flag `hd` di ElBackrooms, default false. Kalau true: aktifkan
+        wallTrim/stripesZ/detail. Kalau false: cuma quadL dasar + lampu.
+      * Matikan gloss (gloss = 0) kalau spekular masih berat.
+      * Naikkan heap JVM ke 2048 MB di Processing Preferences.
+  [ ] Verifikasi masalah "nembus" benar-benar hilang (dengan HD lighting yang
+      lebih banyak draw call).
   [ ] Pemilik menyesuaikan jadwal draw() dengan struktur lagu sebenarnya.
 
 Mendekati video referensi (opsional, belum diminta secara eksplisit):
   [ ] ElEfekVHS (2D overlay): grain, bintik debu, garis scan, glitch horizontal,
-      vignette. Parameter intensitas bisa mengikuti t.frac / t.newBeat.
-  [ ] ElTeksKinetik: lirik/huruf besar melengkung, teks bertumpuk di dinding/lantai
-      (di video: tulisan "くりかえす" memenuhi dinding & lantai Backrooms). Bisa
-      dibuat sebagai texture di dalam Canvas3D Backrooms (g.text pada bidang 3D).
-  [ ] ElRuangBola: ruang bola + perosotan + plafon ungu kotak-kotak (adegan akhir
-      "ふらくたる" di video).
+      vignette. (Sebagian sudah ada di el_EfekVHS.pde, tapi mungkin bisa dipertebal.)
+  [ ] ElTeksKinetik (di dalam 3D): lirik/huruf besar melengkung, teks bertumpuk di
+      dinding/lantai (di video: tulisan "くりかえす" memenuhi dinding & lantai
+      Backrooms). Bisa dibuat sebagai texture di dalam Canvas3D Backrooms.
+  [ ] ElRuangBola: ruang bola + perosotan + plafon ungu kotak-kotak.
   [ ] Variasi ruang untuk ElBackrooms (lorong bergerak): ruang abu-abu dengan kotak
-      hitam, lorong ungu dengan pintu (saat ini hanya dibedakan lewat palette warna).
-      Catatan: 4 ruang statis dari gambar referensi sudah ada di ElBackroomStatic.
+      hitam, lorong ungu dengan pintu. Saat ini hanya dibedakan lewat palette warna.
   [ ] Karakter/sprite berlari di tengah (butuh aset gambar; kalau ada spritesheet,
       buat ElKarakter dengan animasi per beat).
   [ ] Transisi antar adegan (flash putih / glitch) memakai t.newBeat atau
       clock.atBeat(n).
+  [ ] Latar menu: bisa dikasih tambahan partikel debu 3D atau sfx halus (bukan
+      lagu utama) - opsional.
 
 Kualitas kode:
   [ ] Pertimbangkan satu Canvas3D bersama untuk semua element 3D jika memori/performa
-      jadi masalah (saat ini tiap element 3D punya kanvas sendiri, dibuat lazy).
+      jadi masalah (saat ini tiap element 3D punya kanvas sendiri, dibuat lazy:
+      ElBackrooms, ElBackroomStatic, ElDoorLoop, ElVoidFall, ElLorongCahaya,
+      ElRuangBeat (extends ElBackroomStatic - punya cv sendiri), ElRuangTV,
+      ElMainMenu. Itu banyak framebuffer GPU).
   [ ] Pindahkan data jadwal ke satu struktur (mis. array jadwal) jika draw() makin
       panjang.
+  [ ] Kalau ElRuangBeat extends ElBackroomStatic, lebih baik berbagi Canvas3D
+      lewat parameter (bukan bikin field cv sendiri) supaya hemat framebuffer.
 
 =====================================================================
  6. CARA MELANJUTKAN (CHECKLIST CEPAT)
@@ -251,9 +352,11 @@ Kualitas kode:
   2. Pastikan data/ berisi NotoSansJP-Regular.ttf dan assets/MainSong.mp3
      (path di setup() pa_mv.pde; sesuaikan bila beda).
   3. Pastikan library "Sound" terpasang (Sketch > Import Library > Manage).
-  4. Run. Jika ada error, perbaiki dulu sebelum menambah fitur.
-  5. Tambah fitur memakai pola di README_PROYEK.txt bagian 4.
-  6. Perbarui README_PROGRESS.txt: pindahkan item TODO yang selesai ke CHANGELOG,
+  4. Kalau OOM: Preferences > Increase maximum available memory > 2048 MB.
+     Kalau masih OOM: ganti pixelDensity(displayDensity()) -> pixelDensity(1).
+  5. Run. Kalau ada error, perbaiki dulu sebelum menambah fitur.
+  6. Tambah fitur memakai pola di README_PROYEK.txt bagian 4.
+  7. Perbarui README_PROGRESS.txt: pindahkan item TODO yang selesai ke CHANGELOG,
      ubah STATUS PENGUJIAN sesuai hasil nyata.
 
 =====================================================================
