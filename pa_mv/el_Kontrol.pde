@@ -15,7 +15,7 @@ class ElKontrol {
   SoundFile lagu;           // file lagu yang dikontrol
   BeatClock clock;          // jam beat yang ikut di-reset saat restart
   boolean isPlaying = true; // status main (dipakai FxRiser)
-  float checkpointSec = 13;  // posisi (detik) yang dipakai RESTART. 0 = awal lagu
+  float checkpointSec = 0;  // posisi (detik) yang dipakai RESTART. 0 = awal lagu
 
   ElKontrol(SoundFile lagu, BeatClock clock) {
     this.lagu = lagu;

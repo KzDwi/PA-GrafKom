@@ -59,7 +59,7 @@ class ElLirik {
     "ふら", "ふらふら", "ふらふらふら", "ふらふらふらふら",
     "ふらくたる", "ふ ら く た る", "ふ  ら  く  た  る", "ふ　　ら　　く　　た　　る",
 
-    "ああ、扉を開け","意味も忘れ",
+    "ああ","ああ、扉を開け","意味も忘れ",
     "いかれた夢の奥へ","どこまでも続いてく",
 
     "くるくるくりかえす"
@@ -82,7 +82,7 @@ class ElLirik {
     236, 239, 242, 245,
     248, 249, 250, 251,
     252, 255, 258, 261,
-    264, 269,
+    264, 266, 269,
     274, 281,
     292
   };
@@ -104,9 +104,9 @@ class ElLirik {
     3,  3,  3,  3,
     1,  1,  1,  1,
     3,  3,  3,  3,
-    4,  3,
+    2,  3,  5,
     6, 10,
-    5
+    4
   };
 
   ElLirik(PFont font) {
@@ -131,6 +131,9 @@ class ElLirik {
         if (shake > 0) drawShakyLine(lirik[i], width / 2, height - 120, shake, t.beatPos);
         else if (lirik[i].equals("終わらないロード") && t.beatPos >= 180) {
           drawWideDashLine(lirik[i], width / 2, height - 120, t.beatPos);
+        } else if (lirikBeat[i] >= 264 && lirikBeat[i] <= 281 &&
+                   t.beatPos < lirikBeat[i] + 0.5) {
+          drawSlidingLyric(i, t.beatPos, alpha);
         } else text(lirik[i], width / 2, height - 120);
       }
     }
@@ -138,10 +141,28 @@ class ElLirik {
   }
 
   float lyricAlpha(String line, float beatPos) {
-    if (!line.equals("空回るソウト") || beatPos < 173) return 255;
-    int fadeStep = (int) floor(beatPos * 1.2) - (int) floor(173 * 1.2);
+    float fadeStart;
+    if (line.equals("空回るソウト")) fadeStart = 173;
+    else if (line.equals("どこまでも続いてく")) fadeStart = 288;
+    else return 255;
+    if (beatPos < fadeStart) return 255;
+    int fadeStep = (int) floor(beatPos * 1.2) - (int) floor(fadeStart * 1.2);
     float fadeProgress = constrain(fadeStep / 5.0, 0, 1);
     return 255 * (1 - fadeProgress);
+  }
+
+  void drawSlidingLyric(int index, float beatPos, float alpha) {
+    float start = lirikBeat[index];
+    float progress = constrain((beatPos - start) / 0.5, 0, 1);
+    float slideDistance = width * 0.25;
+    float centerY = height - 120;
+    if (progress < 1 && index > 0 &&
+        lirikBeat[index - 1] + durasiLirik[index - 1] == lirikBeat[index]) {
+      fill(255);
+      text(lirik[index - 1], width / 2 - slideDistance * progress, centerY);
+    }
+    fill(255, alpha);
+    text(lirik[index], width / 2 + slideDistance * (1 - progress), centerY);
   }
 
   float lyricShake(int beat) {
@@ -154,6 +175,9 @@ class ElLirik {
     if (beat >= 239 && beat < 241 || beat >= 255 && beat < 257) return 5;
     if (beat >= 242 && beat < 244 || beat >= 258 && beat < 260) return 10;
     if (beat >= 245 && beat < 247 || beat >= 261 && beat < 263) return 20;
+
+    
+    if (beat >= 292 && beat < 296) return 2;
     return 0;
   }
 
