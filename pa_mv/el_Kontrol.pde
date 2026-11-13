@@ -61,6 +61,21 @@ class ElKontrol {
     setPlaying(true);
   }
 
+  // Bersihkan semua state audio & efek, siap untuk kembali ke menu.
+  // (Menu sendiri di-reset terpisah dari pa_mv.pde — kontrol tidak punya
+  //  referensi ke objek menu.)
+ // Bersihkan semua state audio & efek, siap untuk kembali ke menu.
+  void kembaliKeMenu() {
+    lagu.stop();        // stop — posisi TIDAK di-reset, tapi juga TIDAK memutar
+    // JANGAN lagu.jump(0) di sini! 
+    // jump() pada file yang stopped akan MEMULAI playback dari posisi itu.
+    // Posisi akan dipaksa ke 0 di mulaiLagu() saat user klik PLAY.
+    clock.reset();
+    transitionFx.reset();
+    riser.stopNow();
+    setPlaying(true);   // tombol kembali jadi "PAUSE" (state awal)
+  }
+
   void mousePressed() {
     // Abaikan klik yang terlalu cepat beruntun (penyebab 2 lagu jalan bareng)
     if (millis() - lastClickMs < 200) return;

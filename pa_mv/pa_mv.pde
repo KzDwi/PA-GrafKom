@@ -5,7 +5,8 @@
 // =====================================================================
 import processing.sound.*;
 
-final float VOLUME = 0.1;   // volume lagu (dipakai juga saat play/restart)
+float VOLUME = 0.1;      // volume lagu (dipakai juga saat play/restart)
+ElMainMenu menu;   
 SoundFile lagu;
 PFont fontJepang;
 BeatClock clock;
@@ -13,9 +14,9 @@ BeatClock clock;
 // ---- daftar element ----
 ElBackrooms  backrooms;
 ElBackroomStatic backroomStatic;
-ElBola       bola;
-ElPolyrhythm poli;
-ElJudul      judul;
+// ElBola       bola;
+// ElPolyrhythm poli;
+// ElJudul      judul;
 ElLirik      lirik;
 ElDebug      debug;
 ElKontrol    kontrol;
@@ -43,16 +44,15 @@ void setup() {
 
   fontJepang = createFont("NotoSansJP-Regular.ttf", 32);
   lagu = new SoundFile(this, "assets/MainSong.mp3");
-  lagu.play();
-  lagu.amp(VOLUME); // buat test aja
+  menu = new ElMainMenu(fontJepang, VOLUME);
   
   clock = new BeatClock();
 
   backrooms = new ElBackrooms();
   backroomStatic = new ElBackroomStatic();
-  bola      = new ElBola(100);
-  poli      = new ElPolyrhythm(200, 60);
-  judul     = new ElJudul(fontJepang, "LOOPING THE ROOM");
+  // bola      = new ElBola(100);
+  // poli      = new ElPolyrhythm(200, 60);
+  // judul     = new ElJudul(fontJepang, "LOOPING THE ROOM");
   lirik     = new ElLirik(fontJepang);
   debug     = new ElDebug(fontJepang);
   kontrol   = new ElKontrol(lagu, clock);
@@ -75,6 +75,12 @@ void setup() {
 }
 
 void draw() {
+  if (!menu.selesai) {
+  VOLUME = menu.volume;          // slider langsung mengubah VOLUME global
+  menu.show();
+  if (menu.selesai) mulaiLagu();
+  return;
+  }
   clock.update(lagu.position() * 1000);
   background(0);
 
@@ -110,9 +116,11 @@ void draw() {
   // Urutan panggil = urutan tumpukan (yang terakhir paling depan)
   if (clock.inBeat(312, 328)) kolomNeg.show(clock, 312, 328);   // kartu emas transparan loncat per beat (ruangan tetap ganti tiap beat) (di atas latar 3D, di bawah teks)
 
-  if (!clock.inBeat(100, 136) && clock.beat < 168) bola.show(clock); // bola disembunyikan di adegan pintu & kinetik
-  if (clock.inBeat(0, 200)) poli.show(clock);      // beat 0-199
+  // if (!clock.inBeat(100, 136) && clock.beat < 168) bola.show(clock); // bola disembunyikan di adegan pintu & kinetik
+  // if (clock.inBeat(0, 200)) poli.show(clock);      // beat 0-199
   
+
+
   //40,47
   if (clock.inBeat(40, 49)) {
   tvStatic.show(clock,1);
@@ -158,7 +166,7 @@ void draw() {
   if (clock.beat >= 329) ruangTV.show(clock);
 
   transitionFx.show();
-  judul.show(clock);
+  // judul.show(clock);
   if (!clock.inBeat(200, 231)) lirik.show(clock);                            // timing lirik diatur di el_Teks.pde
   transitionFx.showGlitch();                       // glitch satu layar (di atas semua, di bawah UI)
 
@@ -191,6 +199,8 @@ void draw() {
   
   // ===================== 4. EVENT SEKALI (di sini switch cocok) =====================
   // ---- GLITCH (jadwal dalam SUBBEAT; 1 beat = 2 subbeat) ----
+  if (clock.atSubBeat(14)) transitionFx.triggerGlitch();   // baet 7 :
+  if (clock.atSubBeat(15)) transitionFx.triggerGlitch();   // baet 7 :
   if (clock.atSubBeat(142)) transitionFx.triggerGlitch();  // Beat 71  : 
   if (clock.atSubBeat(158)) transitionFx.triggerGlitch();  // Beat 79  : 
   if (clock.atSubBeat(174)) transitionFx.triggerGlitch();  // Beat 87  : 
@@ -223,12 +233,32 @@ void draw() {
   }
 }
 
-
-
-void mousePressed() {
-  kontrol.mousePressed();
+void mulaiLagu() {
+  if (lagu == null) return;
+  if (!lagu.isPlaying()) {
+    lagu.loop();       // loop() restart dari awal → tidak dobel
+  }
+  lagu.amp(VOLUME);    // setelah loop() supaya volume tidak ter-reset
 }
 
+void mousePressed() {
+  if (!menu.selesai) { menu.mousePressed(); return; }
+  kontrol.mousePressed();
+}
+void mouseDragged()  { if (!menu.selesai) menu.mouseDragged(); }
+void mouseReleased() { menu.mouseReleased(); }
+
 void keyPressed() {
-  if (key == 'c' || key == 'C') kontrol.setCheckpoint();   // simpan titik RESTART di posisi sekarang
+  if (!menu.selesai) {
+    if (key == ENTER || key == RETURN || key == ' ') menu.tekanPlay();
+    return;
+  }
+  if (key == 'c' || key == 'C') kontrol.setCheckpoint();
+  if (key == ESC) {
+    key = 0;                 // ⚠ wajib: cegah Processing menutup sketch
+    if (menu.selesai) {      // hanya jika sedang di dalam "game"
+      kontrol.kembaliKeMenu();
+      menu.reset();
+    }
+  }
 }
